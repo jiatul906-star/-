@@ -98,34 +98,47 @@ AI 聊天工具包含五个功能模块：AI 聊天、DIY 角色创建、TTS 语
 
 ---
 
-## 🔴 请程序员回答（2026-05-15）
+## ✅ 决策已确认（2026-05-15）
 
-方案 C 已定，以下两个问题需要你来决策：
+### 问题 1：插件框架方案 → **简单模块加载**
 
-### 问题 1：插件框架方案
+插件通过 ES module `import()` 动态加载，共享渲染进程。插件间通过壳层事件总线通信。
 
-插件之间怎么隔离和加载？
+```
+src/
+├── core/           # 壳（窗口管理、主题、IPC）
+├── plugins/
+│   ├── chat/       # import { ChatPlugin } from './plugins/chat'
+│   ├── diy/
+│   ├── tts/
+│   └── pet/
+└── shared/         # 公共类型、工具、数据层
+```
 
-| 选项 | 说明 | 适用场景 |
-|------|------|---------|
-| 简单模块加载 | 编译时或动态 import，共享进程 | 小项目，插件间信任度高 |
-| 微前端 (qiankun/Micro-app) | 各插件独立构建，运行时加载 | Web 技术栈，需要独立部署 |
-| 进程隔离 (Electron BrowserWindow/WebContents) | 每个插件独立进程 | 安全性高，插件可能来自第三方 |
+**理由**：
+- 唯一开发者，所有插件可控，无需进程隔离
+- 桌宠独立窗口 ≠ 桌宠独立进程 — 可以用独立 BrowserWindow 但代码仍共享加载
+- 省掉 IPC 层开发时间，投入在核心功能上
 
-你的推荐是？还是有其他方案？
+### 问题 2：桌宠桌面悬浮 → **BrowserWindow 透明置顶 + IPC 同步**
 
-### 问题 2：桌宠桌面悬浮实现
+桌宠使用独立透明 BrowserWindow（`transparent + alwaysOnTop + frame: false`），与主窗口通过 IPC 同步位置。
 
-桌宠需要"可以嵌入主窗口，也可以弹出独立悬浮在桌面"。具体怎么实现？
+```
+主窗口（聊天/设置）         桌宠窗口（独立 BrowserWindow）
+  move/resize 事件 ──IPC──→   setBounds({ x, y })
+  状态变化通知      ←──IPC──   拖拽/交互事件
+```
 
-| 选项 | 说明 |
-|------|------|
-| Electron BrowserWindow (alwaysOnTop + transparent) | 独立窗口，置顶透明，可拖拽 |
-| Electron 多窗口 + 主窗口通信 | 主窗口和桌宠窗口 IPC 通信同步状态 |
-| 其他方案 | 你判断 |
+**核心配置**：
+- `transparent: true` — 背景透明，只显示角色
+- `alwaysOnTop: true` — 桌面悬浮
+- `frame: false` — 无边框
+- `setIgnoreMouseEvents(true, { forward: true })` — 透明区域穿透，角色本体取消穿透可交互
+- `skipTaskbar: true` — 不在任务栏显示
 
-需要你确认技术可行性和具体选型。
+**骑乘态**：主窗口 `move`/`resize` 事件 → IPC 发送坐标 → 桌宠窗口 `setBounds()` 跟随
 
----
+**自由态**：用户拖拽角色离开窗口 → 停止跟随 → 角色独立悬浮桌面
 
-请直接在下面回复，或告诉 Claude 你的选择，我来更新文档。
+**过渡动画**：CSS transition 300ms ease-out
