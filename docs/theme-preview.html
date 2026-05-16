@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>主题色预览 — AI聊天工具</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: "Microsoft YaHei", "Segoe UI", sans-serif; background:#e8e8e8; padding:24px; }
+h1 { text-align:center; margin-bottom:8px; font-size:20px; color:#333; }
+.subtitle { text-align:center; margin-bottom:24px; font-size:13px; color:#888; }
+
+.grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(420px, 1fr)); gap:20px; max-width:1400px; margin:0 auto; }
+
+.theme-card { border-radius:12px; overflow:hidden; box-shadow:0 4px 20px rgba(0,0,0,0.1); }
+
+.theme-header { padding:12px 20px; font-size:15px; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+
+/* columns side by side */
+.columns { display:grid; grid-template-columns:1fr 1fr; gap:1px; }
+.col { padding:16px; }
+
+.swatch-row { display:flex; align-items:center; margin-bottom:8px; gap:10px; }
+.swatch { width:40px; height:24px; border-radius:6px; flex-shrink:0; }
+.swatch-label { font-size:11px; flex:1; }
+.swatch-hex { font-size:10px; font-family:monospace; opacity:0.7; }
+
+.sep { border:none; border-top:1px dashed; margin:10px 0; opacity:0.3; }
+
+/* bubble mock */
+.bubble-section { margin-top:10px; }
+.bubble { padding:8px 14px; border-radius:16px; font-size:12px; margin-bottom:6px; max-width:85%; word-break:break-all; }
+.bubble.ai { border-bottom-left-radius:4px; }
+.bubble.user { border-bottom-right-radius:4px; margin-left:auto; text-align:right; }
+
+.theme-name { font-weight:700; }
+.mode-label { font-size:11px; opacity:0.7; }
+
+.footer-note { text-align:center; margin-top:24px; font-size:11px; color:#999; }
+</style>
+</head>
+<body>
+
+<h1>AI聊天工具 — 主题色预览</h1>
+<p class="subtitle">左:浅色 · 右:暗色 | 每个卡片含色板 + 聊天气泡模拟</p>
+
+<div class="grid">
+
+  <!-- 暖桃 -->
+  <div class="theme-card">
+    <div class="theme-header" style="background:#E8927C;color:#fff;">
+      <span class="theme-name">1. 暖桃 (默认)</span>
+      <span class="mode-label">浅色 ← → 暗色</span>
+    </div>
+    <div class="columns">
+
+      <div class="col" style="background:#FBF9F7;color:#1a1a1a;">
+        <div class="swatch-row"><div class="swatch" style="background:#FBF9F7;border:1px solid #ddd;"></div><span class="swatch-label">主背景</span><span class="swatch-hex">#FBF9F7</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#F5F3F1;"></div><span class="swatch-label">AI气泡</span><span class="swatch-hex">#F5F3F1</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#FFE0D8;"></div><span class="swatch-label">用户气泡</span><span class="swatch-hex">#FFE0D8</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#E8927C;"></div><span class="swatch-label">强调色</span><span class="swatch-hex">#E8927C</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#FFFFFF;border:1px solid #eee;"></div><span class="swatch-label">卡片</span><span class="swatch-hex">#FFFFFF</span></div>
+        <hr class="sep" style="border-color:#ddd;">
+        <div class="bubble-section">
+          <div class="bubble ai" style="background:#F5F3F1;">AI: 今天天气真好呢~</div>
+          <div class="bubble user" style="background:#FFE0D8;">是呀，适合出去走走</div>
+        </div>
+      </div>
+
+      <div class="col" style="background:#1E1B1A;color:#E8E4E1;">
+        <div class="swatch-row"><div class="swatch" style="background:#1E1B1A;border:1px solid #444;"></div><span class="swatch-label">主背景</span><span class="swatch-hex">#1E1B1A</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#2A2625;"></div><span class="swatch-label">AI气泡</span><span class="swatch-hex">#2A2625</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#3D2824;"></div><span class="swatch-label">用户气泡</span><span class="swatch-hex">#3D2824</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#F0A090;"></div><span class="swatch-label">强调色</span><span class="swatch-hex">#F0A090</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#242120;border:1px solid #444;"></div><span class="swatch-label">卡片</span><span class="swatch-hex">#242120</span></div>
+        <hr class="sep" style="border-color:#333;">
+        <div class="bubble-section">
+          <div class="bubble ai" style="background:#2A2625;">AI: 今天天气真好呢~</div>
+          <div class="bubble user" style="background:#3D2824;">是呀，适合出去走走</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 薄荷 -->
+  <div class="theme-card">
+    <div class="theme-header" style="background:#7DB8A8;color:#fff;">
+      <span class="theme-name">2. 薄荷</span>
+      <span class="mode-label">浅色 ← → 暗色</span>
+    </div>
+    <div class="columns">
+
+      <div class="col" style="background:#F5F9F8;color:#1a1a1a;">
+        <div class="swatch-row"><div class="swatch" style="background:#F5F9F8;border:1px solid #ddd;"></div><span class="swatch-label">主背景</span><span class="swatch-hex">#F5F9F8</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#F5F9F8;"></div><span class="swatch-label">AI气泡</span><span class="swatch-hex">#F5F9F8</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#D4EDE8;"></div><span class="swatch-label">用户气泡</span><span class="swatch-hex">#D4EDE8</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#7DB8A8;"></div><span class="swatch-label">强调色</span><span class="swatch-hex">#7DB8A8</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#FFFFFF;border:1px solid #eee;"></div><span class="swatch-label">卡片</span><span class="swatch-hex">#FFFFFF</span></div>
+        <hr class="sep" style="border-color:#ddd;">
+        <div class="bubble-section">
+          <div class="bubble ai" style="background:#F5F9F8;">AI: 今天天气真好呢~</div>
+          <div class="bubble user" style="background:#D4EDE8;">是呀，适合出去走走</div>
+        </div>
+      </div>
+
+      <div class="col" style="background:#1A1E1D;color:#E8E4E1;">
+        <div class="swatch-row"><div class="swatch" style="background:#1A1E1D;border:1px solid #444;"></div><span class="swatch-label">主背景</span><span class="swatch-hex">#1A1E1D</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#242A28;"></div><span class="swatch-label">AI气泡</span><span class="swatch-hex">#242A28</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#1F3D35;"></div><span class="swatch-label">用户气泡</span><span class="swatch-hex">#1F3D35</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#8CCCB8;"></div><span class="swatch-label">强调色</span><span class="swatch-hex">#8CCCB8</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#1F2422;border:1px solid #444;"></div><span class="swatch-label">卡片</span><span class="swatch-hex">#1F2422</span></div>
+        <hr class="sep" style="border-color:#333;">
+        <div class="bubble-section">
+          <div class="bubble ai" style="background:#242A28;">AI: 今天天气真好呢~</div>
+          <div class="bubble user" style="background:#1F3D35;">是呀，适合出去走走</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 薰衣草 -->
+  <div class="theme-card">
+    <div class="theme-header" style="background:#A78BFA;color:#fff;">
+      <span class="theme-name">3. 薰衣草</span>
+      <span class="mode-label">浅色 ← → 暗色</span>
+    </div>
+    <div class="columns">
+
+      <div class="col" style="background:#F9F7FC;color:#1a1a1a;">
+        <div class="swatch-row"><div class="swatch" style="background:#F9F7FC;border:1px solid #ddd;"></div><span class="swatch-label">主背景</span><span class="swatch-hex">#F9F7FC</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#F9F7FC;"></div><span class="swatch-label">AI气泡</span><span class="swatch-hex">#F9F7FC</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#E8DFF5;"></div><span class="swatch-label">用户气泡</span><span class="swatch-hex">#E8DFF5</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#A78BFA;"></div><span class="swatch-label">强调色</span><span class="swatch-hex">#A78BFA</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#FFFFFF;border:1px solid #eee;"></div><span class="swatch-label">卡片</span><span class="swatch-hex">#FFFFFF</span></div>
+        <hr class="sep" style="border-color:#ddd;">
+        <div class="bubble-section">
+          <div class="bubble ai" style="background:#F9F7FC;">AI: 今天天气真好呢~</div>
+          <div class="bubble user" style="background:#E8DFF5;">是呀，适合出去走走</div>
+        </div>
+      </div>
+
+      <div class="col" style="background:#1D1B20;color:#E8E4E1;">
+        <div class="swatch-row"><div class="swatch" style="background:#1D1B20;border:1px solid #444;"></div><span class="swatch-label">主背景</span><span class="swatch-hex">#1D1B20</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#27242D;"></div><span class="swatch-label">AI气泡</span><span class="swatch-hex">#27242D</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#2E263D;"></div><span class="swatch-label">用户气泡</span><span class="swatch-hex">#2E263D</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#B8A0F8;"></div><span class="swatch-label">强调色</span><span class="swatch-hex">#B8A0F8</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#232028;border:1px solid #444;"></div><span class="swatch-label">卡片</span><span class="swatch-hex">#232028</span></div>
+        <hr class="sep" style="border-color:#333;">
+        <div class="bubble-section">
+          <div class="bubble ai" style="background:#27242D;">AI: 今天天气真好呢~</div>
+          <div class="bubble user" style="background:#2E263D;">是呀，适合出去走走</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 奶咖 -->
+  <div class="theme-card">
+    <div class="theme-header" style="background:#C4A882;color:#fff;">
+      <span class="theme-name">4. 奶咖</span>
+      <span class="mode-label">浅色 ← → 暗色</span>
+    </div>
+    <div class="columns">
+
+      <div class="col" style="background:#FAF8F5;color:#1a1a1a;">
+        <div class="swatch-row"><div class="swatch" style="background:#FAF8F5;border:1px solid #ddd;"></div><span class="swatch-label">主背景</span><span class="swatch-hex">#FAF8F5</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#FAF8F5;"></div><span class="swatch-label">AI气泡</span><span class="swatch-hex">#FAF8F5</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#E8DDD0;"></div><span class="swatch-label">用户气泡</span><span class="swatch-hex">#E8DDD0</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#C4A882;"></div><span class="swatch-label">强调色</span><span class="swatch-hex">#C4A882</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#FFFFFF;border:1px solid #eee;"></div><span class="swatch-label">卡片</span><span class="swatch-hex">#FFFFFF</span></div>
+        <hr class="sep" style="border-color:#ddd;">
+        <div class="bubble-section">
+          <div class="bubble ai" style="background:#FAF8F5;">AI: 今天天气真好呢~</div>
+          <div class="bubble user" style="background:#E8DDD0;">是呀，适合出去走走</div>
+        </div>
+      </div>
+
+      <div class="col" style="background:#1D1B18;color:#E8E4E1;">
+        <div class="swatch-row"><div class="swatch" style="background:#1D1B18;border:1px solid #444;"></div><span class="swatch-label">主背景</span><span class="swatch-hex">#1D1B18</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#292522;"></div><span class="swatch-label">AI气泡</span><span class="swatch-hex">#292522</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#3A3028;"></div><span class="swatch-label">用户气泡</span><span class="swatch-hex">#3A3028</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#D4B898;"></div><span class="swatch-label">强调色</span><span class="swatch-hex">#D4B898</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#23201D;border:1px solid #444;"></div><span class="swatch-label">卡片</span><span class="swatch-hex">#23201D</span></div>
+        <hr class="sep" style="border-color:#333;">
+        <div class="bubble-section">
+          <div class="bubble ai" style="background:#292522;">AI: 今天天气真好呢~</div>
+          <div class="bubble user" style="background:#3A3028;">是呀，适合出去走走</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 樱花 -->
+  <div class="theme-card">
+    <div class="theme-header" style="background:#F48B8B;color:#fff;">
+      <span class="theme-name">5. 樱花</span>
+      <span class="mode-label">浅色 ← → 暗色</span>
+    </div>
+    <div class="columns">
+
+      <div class="col" style="background:#FFF5F5;color:#1a1a1a;">
+        <div class="swatch-row"><div class="swatch" style="background:#FFF5F5;border:1px solid #ddd;"></div><span class="swatch-label">主背景</span><span class="swatch-hex">#FFF5F5</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#FFF5F5;"></div><span class="swatch-label">AI气泡</span><span class="swatch-hex">#FFF5F5</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#FFD4D4;"></div><span class="swatch-label">用户气泡</span><span class="swatch-hex">#FFD4D4</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#F48B8B;"></div><span class="swatch-label">强调色</span><span class="swatch-hex">#F48B8B</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#FFFFFF;border:1px solid #eee;"></div><span class="swatch-label">卡片</span><span class="swatch-hex">#FFFFFF</span></div>
+        <hr class="sep" style="border-color:#ddd;">
+        <div class="bubble-section">
+          <div class="bubble ai" style="background:#FFF5F5;">AI: 今天天气真好呢~</div>
+          <div class="bubble user" style="background:#FFD4D4;">是呀，适合出去走走</div>
+        </div>
+      </div>
+
+      <div class="col" style="background:#1F1A1B;color:#E8E4E1;">
+        <div class="swatch-row"><div class="swatch" style="background:#1F1A1B;border:1px solid #444;"></div><span class="swatch-label">主背景</span><span class="swatch-hex">#1F1A1B</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#2C2425;"></div><span class="swatch-label">AI气泡</span><span class="swatch-hex">#2C2425</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#3D2025;"></div><span class="swatch-label">用户气泡</span><span class="swatch-hex">#3D2025</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#F8A0A0;"></div><span class="swatch-label">强调色</span><span class="swatch-hex">#F8A0A0</span></div>
+        <div class="swatch-row"><div class="swatch" style="background:#241F20;border:1px solid #444;"></div><span class="swatch-label">卡片</span><span class="swatch-hex">#241F20</span></div>
+        <hr class="sep" style="border-color:#333;">
+        <div class="bubble-section">
+          <div class="bubble ai" style="background:#2C2425;">AI: 今天天气真好呢~</div>
+          <div class="bubble user" style="background:#3D2025;">是呀，适合出去走走</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<p class="footer-note">每个卡片左侧是浅色版，右侧是暗色版。底部模拟聊天气泡：左边AI、右边用户。</p>
+
+</body>
+</html>

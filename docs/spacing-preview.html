@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>窗口间距参考 — 聊天窗口布局</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+  background: #e0ddd5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  min-height: 100vh;
+}
+
+.toolbar {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  max-width: 900px;
+  width: 100%;
+}
+.toolbar label { font-size: 11px; color: #888; display: block; margin-bottom: 2px; }
+.toolbar .group { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.toolbar input[type=range] { width: 100px; }
+.toolbar .val { font-size: 11px; font-weight: 600; color: #333; min-width: 32px; text-align: center; }
+
+.presets { display: flex; gap: 8px; margin-left: auto; }
+.presets button {
+  padding: 6px 14px;
+  border: 1.5px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.presets button:hover { border-color: #E8927C; color: #E8927C; }
+.presets button.active { background: #E8927C; color: #fff; border-color: #E8927C; }
+
+/* ===== Chat Window ===== */
+.chat-window {
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  background: #FBF9F7;
+  display: flex;
+  flex-direction: column;
+  resize: both;
+  min-width: 320px;
+  min-height: 400px;
+}
+
+/* Title bar */
+.title-bar {
+  background: #F5F3F1;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-bottom: 1px solid #eee;
+  position: relative;
+  cursor: default;
+}
+.title-bar .char-avatar {
+  border-radius: 50%;
+  background: #FFE0D8;
+  flex-shrink: 0;
+  /* size set by JS */
+}
+.title-bar .char-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+  margin-left: 8px;
+}
+.title-bar .mascot {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 28px;
+  pointer-events: none;
+}
+
+/* Body */
+.chat-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Left sidebar */
+.sidebar {
+  background: #F5F3F1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 12px;
+  gap: 10px;
+  border-right: 1px solid #eee;
+  flex-shrink: 0;
+}
+.side-avatar {
+  border-radius: 50%;
+  background: #FFE0D8;
+}
+.side-avatar.active {
+  outline: 2px solid #E8927C;
+  outline-offset: 2px;
+}
+.side-add {
+  border-radius: 50%;
+  border: 1.5px dashed #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #bbb;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* Chat area */
+.chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Messages */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding-left: 16px;
+  padding-right: 16px;
+  padding-top: 12px;
+  gap: 4px; /* same-sender gap */
+}
+
+.msg-group { display: flex; flex-direction: column; }
+.msg-group.ai { align-items: flex-start; }
+.msg-group.user { align-items: flex-end; }
+.msg-group + .msg-group { margin-top: 8px; } /* diff-sender gap */
+
+.bubble {
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 75%;
+  word-break: break-all;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.bubble.ai {
+  background: #F5F3F1;
+  border-bottom-left-radius: 6px;
+}
+.bubble.user {
+  background: #FFE0D8;
+  border-bottom-right-radius: 6px;
+  text-align: right;
+}
+.bubble + .bubble { margin-top: 2px; }
+.bubble:first-child { border-top-left-radius: 18px; border-top-right-radius: 18px; }
+.bubble:last-child { border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }
+
+.timestamp {
+  font-size: 11px;
+  color: #bbb;
+  margin: 2px 6px 0;
+}
+
+/* Input area */
+.input-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid #eee;
+  background: #fff;
+}
+.input-area input {
+  flex: 1;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  background: #FBF9F7;
+}
+.input-area input:focus { border-color: #E8927C; }
+.send-btn {
+  padding: 8px 18px;
+  background: #E8927C;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Dimensional annotations */
+.dim-h, .dim-v {
+  position: relative;
+}
+.dim-h::after {
+  content: '';
+  position: absolute;
+  background: rgba(232,146,124,0.15);
+  pointer-events: none;
+}
+.info-overlay {
+  position: absolute;
+  font-size: 10px;
+  color: #E8927C;
+  font-weight: 600;
+  pointer-events: none;
+  white-space: nowrap;
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="group">
+    <label>左侧栏宽</label>
+    <input type="range" id="sidebarW" min="36" max="80" value="52" step="2">
+    <span class="val" id="sidebarW_val">52px</span>
+  </div>
+  <div class="group">
+    <label>头像大小</label>
+    <input type="range" id="avatarSize" min="28" max="52" value="38" step="2">
+    <span class="val" id="avatarSize_val">38px</span>
+  </div>
+  <div class="group">
+    <label>标题栏高</label>
+    <input type="range" id="titleH" min="32" max="56" value="40" step="2">
+    <span class="val" id="titleH_val">40px</span>
+  </div>
+  <div class="group">
+    <label>消息区padding</label>
+    <input type="range" id="msgPad" min="6" max="28" value="16" step="2">
+    <span class="val" id="msgPad_val">16px</span>
+  </div>
+  <div class="group">
+    <label>气泡最大宽%</label>
+    <input type="range" id="bubbleMaxW" min="50" max="90" value="75" step="5">
+    <span class="val" id="bubbleMaxW_val">75%</span>
+  </div>
+  <div class="group">
+    <label>气泡内padding</label>
+    <input type="range" id="bubblePad" min="6" max="20" value="10" step="1">
+    <span class="val" id="bubblePad_val">10/14</span>
+  </div>
+  <div class="group">
+    <label>不同人间距</label>
+    <input type="range" id="diffSenderGap" min="2" max="20" value="8" step="1">
+    <span class="val" id="diffSenderGap_val">8px</span>
+  </div>
+  <div class="group">
+    <label>输入区高</label>
+    <input type="range" id="inputH" min="36" max="64" value="46" step="2">
+    <span class="val" id="inputH_val">46px</span>
+  </div>
+  <div class="group">
+    <label>默认宽度</label>
+    <input type="range" id="winW" min="360" max="560" value="420" step="10">
+    <span class="val" id="winW_val">420px</span>
+  </div>
+
+  <div class="presets">
+    <button data-preset="compact">紧凑</button>
+    <button data-preset="normal" class="active">舒适</button>
+    <button data-preset="spacious">宽松</button>
+    <button data-preset="qq">QQ风格</button>
+  </div>
+</div>
+
+<div class="chat-window" id="chatWindow">
+  <div class="title-bar" id="titleBar">
+    <div class="char-avatar" id="titleAvatar"></div>
+    <span class="char-name">小桃</span>
+    <div class="mascot">🐱</div>
+  </div>
+  <div class="chat-body">
+    <div class="sidebar" id="sidebar">
+      <div class="side-avatar active" id="sideAvatar1"></div>
+      <div class="side-avatar" id="sideAvatar2"></div>
+      <div class="side-avatar" id="sideAvatar3"></div>
+      <div class="side-add" id="sideAdd">+</div>
+    </div>
+    <div class="chat-area">
+      <div class="messages" id="messages">
+        <div class="msg-group ai">
+          <div class="bubble ai">你好呀~ 今天想聊什么？</div>
+          <span class="timestamp">10:32</span>
+        </div>
+        <div class="msg-group user">
+          <div class="bubble user">今天天气不错</div>
+          <span class="timestamp">10:33</span>
+        </div>
+        <div class="msg-group ai">
+          <div class="bubble ai">是呢！阳光特别好</div>
+          <div class="bubble ai">要不要出去走走？</div>
+          <span class="timestamp">10:33</span>
+        </div>
+        <div class="msg-group user">
+          <div class="bubble user">好的呀，去哪？</div>
+          <span class="timestamp">10:34</span>
+        </div>
+        <div class="msg-group ai">
+          <div class="bubble ai">附近公园怎么样？樱花开了🌸</div>
+          <span class="timestamp">10:34</span>
+        </div>
+        <div class="msg-group user">
+          <div class="bubble user">行，我现在出门</div>
+          <span class="timestamp">10:35</span>
+        </div>
+      </div>
+      <div class="input-area" id="inputArea">
+        <input type="text" placeholder="输入消息...">
+        <span class="send-btn">发送</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const sliders = ['sidebarW','avatarSize','titleH','msgPad','bubbleMaxW','bubblePad','diffSenderGap','inputH','winW'];
+
+const presets = {
+  compact:  { sidebarW:40, avatarSize:30, titleH:34, msgPad:8,  bubbleMaxW:80, bubblePad:7,  diffSenderGap:4,  inputH:38, winW:380 },
+  normal:   { sidebarW:52, avatarSize:38, titleH:40, msgPad:16, bubbleMaxW:75, bubblePad:10, diffSenderGap:8,  inputH:46, winW:420 },
+  spacious: { sidebarW:64, avatarSize:46, titleH:48, msgPad:24, bubbleMaxW:65, bubblePad:14, diffSenderGap:14, inputH:54, winW:480 },
+  qq:       { sidebarW:56, avatarSize:40, titleH:36, msgPad:14, bubbleMaxW:70, bubblePad:9,  diffSenderGap:6,  inputH:44, winW:400 },
+};
+
+function applyPreset(name) {
+  const p = presets[name];
+  if (!p) return;
+  Object.entries(p).forEach(([k,v]) => {
+    $(k).value = v;
+  });
+  update();
+  document.querySelectorAll('.presets button').forEach(b => b.classList.remove('active'));
+  document.querySelector('[data-preset="' + name + '"]').classList.add('active');
+}
+
+function update() {
+  const s = {};
+  sliders.forEach(k => { s[k] = parseInt($(k).value); });
+
+  // Update all value labels
+  sliders.forEach(k => {
+    const el = $(k + '_val');
+    if (el) el.textContent = s[k] + (k === 'bubbleMaxW' ? '%' : 'px');
+  });
+  // bubblePad shows horizontal too
+  var bpv = $('#bubblePad_val');
+  if (bpv) bpv.textContent = s.bubblePad + '/' + (s.bubblePad + 4);
+
+  // Apply to DOM
+  $('#sidebar').style.width = s.sidebarW + 'px';
+  var ava = s.avatarSize;
+  document.querySelectorAll('.side-avatar').forEach(function(el) {
+    el.style.width = ava + 'px';
+    el.style.height = ava + 'px';
+  });
+  $('#sideAdd').style.width = ava + 'px';
+  $('#sideAdd').style.height = ava + 'px';
+  $('#sideAdd').style.lineHeight = ava + 'px';
+  $('#sidebar').style.gap = Math.round(ava * 0.26) + 'px';
+
+  // Title bar
+  $('#titleBar').style.height = s.titleH + 'px';
+  $('#titleAvatar').style.width = Math.round(ava * 0.65) + 'px';
+  $('#titleAvatar').style.height = Math.round(ava * 0.65) + 'px';
+
+  // Messages
+  $('#messages').style.paddingLeft = s.msgPad + 'px';
+  $('#messages').style.paddingRight = s.msgPad + 'px';
+
+  // Bubbles
+  document.querySelectorAll('.bubble').forEach(function(b) {
+    b.style.maxWidth = s.bubbleMaxW + '%';
+    b.style.padding = s.bubblePad + 'px ' + (s.bubblePad + 4) + 'px';
+  });
+
+  // Diff sender gap
+  document.querySelectorAll('.msg-group + .msg-group').forEach(function(g) {
+    g.style.marginTop = s.diffSenderGap + 'px';
+  });
+
+  // Input area
+  $('#inputArea').style.height = s.inputH + 'px';
+
+  // Window width
+  $('#chatWindow').style.width = s.winW + 'px';
+}
+
+sliders.forEach(function(k) {
+  $(k).addEventListener('input', update);
+});
+
+document.querySelectorAll('.presets button').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    applyPreset(btn.dataset.preset);
+  });
+});
+
+update();
+</script>
+
+</body>
+</html>

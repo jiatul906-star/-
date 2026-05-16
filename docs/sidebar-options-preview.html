@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Level 2 设计选项预览</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: "Microsoft YaHei", "Segoe UI", sans-serif; background:#e8e8e8; padding:20px; }
+h1 { text-align:center; margin-bottom:6px; font-size:18px; color:#333; }
+h2 { font-size:15px; color:#555; margin:24px 0 12px; padding-left:8px; border-left:3px solid #E8927C; }
+h3 { font-size:12px; color:#888; margin-bottom:8px; }
+.section { max-width:1200px; margin:0 auto; }
+.row { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:8px; }
+.card { background:#fff; border-radius:10px; padding:12px; box-shadow:0 2px 10px rgba(0,0,0,0.06); display:flex; flex-direction:column; align-items:center; }
+.card .label { font-size:12px; font-weight:600; color:#333; margin-bottom:8px; }
+.card .desc { font-size:10px; color:#999; margin-top:6px; }
+
+/* Chat window mini */
+.chat {
+  border-radius:8px; overflow:hidden;
+  box-shadow:0 3px 14px rgba(0,0,0,0.1);
+  background:#FBF9F7;
+  display:flex; flex-direction:column;
+}
+.title-bar {
+  height:22px; background:#F5F3F1; border-bottom:1px solid #eee;
+  display:flex; align-items:center; padding:0 8px; gap:6px;
+  position:relative;
+}
+.title-bar .dot { width:6px; height:6px; border-radius:50%; background:#ccc; }
+.title-bar .name { font-size:9px; color:#888; }
+.mascot { position:absolute; top:-5px; left:50%; transform:translateX(-50%); font-size:16px; }
+.chat-body { display:flex; flex:1; min-height:0; }
+.sidebar {
+  background:#F5F3F1; display:flex; flex-direction:column;
+  align-items:center; padding-top:8px; gap:6px;
+  border-right:1px solid #eee; flex-shrink:0;
+}
+.sidebar.hidden { display:none; }
+.avatar {
+  border-radius:50%; background:#FFE0D8;
+  flex-shrink:0;
+}
+.avatar.active { outline:2px solid #E8927C; outline-offset:1px; }
+.add-avatar {
+  border-radius:50%; border:1.5px dashed #ccc;
+  color:#bbb; font-size:10px; text-align:center; line-height:24px;
+}
+.chat-area { flex:1; display:flex; flex-direction:column; min-width:0; }
+.messages {
+  flex:1; padding:8px 10px; display:flex; flex-direction:column;
+  gap:4px; overflow:hidden;
+}
+.bubble {
+  padding:5px 9px; border-radius:10px; font-size:10px;
+  line-height:1.4; max-width:80%; box-shadow:0 1px 3px rgba(0,0,0,0.04);
+}
+.bubble.ai { background:#F5F3F1; border-bottom-left-radius:3px; align-self:flex-start; }
+.bubble.user { background:#FFE0D8; border-bottom-right-radius:3px; align-self:flex-end; text-align:right; }
+.input-bar {
+  display:flex; gap:4px; padding:5px 8px; border-top:1px solid #eee; background:#fff;
+  align-items:center;
+}
+.input-bar input {
+  flex:1; border:1px solid #eee; border-radius:6px;
+  padding:4px 8px; font-size:10px; font-family:inherit; outline:none; background:#FBF9F7;
+}
+.send-btn {
+  padding:3px 10px; background:#E8927C; color:#fff;
+  border:none; border-radius:5px; font-size:9px; font-family:inherit;
+  flex-shrink:0; white-space:nowrap;
+}
+
+/* Badge for "当前角色" */
+.badge {
+  position:absolute; top:-4px; right:-4px;
+  width:12px; height:12px; background:#E8927C; border-radius:50%;
+  font-size:7px; color:#fff; text-align:center; line-height:12px;
+}
+
+/* Settings panel style */
+.settings-overlay {
+  position:relative;
+}
+.settings-popup {
+  position:absolute; top:0; left:50%; transform:translateX(-50%);
+  background:#fff; border-radius:8px; padding:12px 16px;
+  box-shadow:0 6px 24px rgba(0,0,0,0.15); z-index:10;
+  width:85%; font-size:10px;
+}
+.settings-popup .setting-row {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:4px 0; border-bottom:1px solid #f0f0f0;
+}
+.settings-popup .setting-label { color:#555; }
+.settings-popup .setting-val { color:#E8927C; font-size:9px; }
+
+/* Settings replacing content */
+.settings-inline {
+  flex:1; padding:10px; display:flex; flex-direction:column; gap:6px;
+}
+.settings-inline .tabs {
+  display:flex; gap:2px; border-bottom:2px solid #eee; margin-bottom:4px;
+}
+.settings-inline .tab {
+  padding:3px 10px; font-size:9px; cursor:pointer; border-radius:6px 6px 0 0;
+  background:#f5f5f5; color:#888;
+}
+.settings-inline .tab.active { background:#E8927C; color:#fff; }
+
+/* Tooltip explanation */
+.option-label {
+  font-size:11px; font-weight:600; color:#E8927C; margin-bottom:4px;
+}
+.option-note {
+  font-size:9px; color:#999; margin-top:4px; text-align:center; max-width:180px;
+}
+</style>
+</head>
+<body>
+
+<h1>Level 2 设计选项预览</h1>
+
+<!-- ====== SECTION 1: SIDEBAR STRATEGY ====== -->
+<h2>问题一：单角色时，左侧栏怎么办？</h2>
+
+<div class="section">
+  <div class="row">
+
+    <!-- Option A: Always show -->
+    <div class="card">
+      <div class="option-label">A. 始终显示</div>
+      <div class="chat" style="width:240px; height:200px;">
+        <div class="title-bar">
+          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          <span class="name">小桃</span>
+          <div class="mascot">🐱</div>
+        </div>
+        <div class="chat-body">
+          <div class="sidebar" style="width:32px;">
+            <div class="avatar active" style="width:22px;height:22px;"></div>
+            <div class="add-avatar" style="width:22px;height:22px;">+</div>
+          </div>
+          <div class="chat-area">
+            <div class="messages">
+              <div class="bubble ai">你好呀~</div>
+              <div class="bubble user">今天天气不错</div>
+              <div class="bubble ai">是呢！</div>
+            </div>
+            <div class="input-bar">
+              <input type="text" placeholder="输入..." disabled>
+              <span class="send-btn">发送</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="option-note">左侧栏只有一个头像+加号，占空间但保持框架稳定</div>
+    </div>
+
+    <!-- Option B: Auto hide -->
+    <div class="card">
+      <div class="option-label">B. 单角色时隐藏</div>
+      <div class="chat" style="width:240px; height:200px;">
+        <div class="title-bar">
+          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          <span class="name">小桃</span>
+          <span style="margin-left:auto;font-size:8px;color:#E8927C;cursor:pointer;">▾ 角色</span>
+          <div class="mascot">🐱</div>
+        </div>
+        <div class="chat-body">
+          <div class="chat-area">
+            <div class="messages">
+              <div class="bubble ai">你好呀~</div>
+              <div class="bubble user">今天天气不错</div>
+              <div class="bubble ai">是呢！</div>
+              <div class="bubble ai">要不要出去走走？</div>
+            </div>
+            <div class="input-bar">
+              <input type="text" placeholder="输入..." disabled>
+              <span class="send-btn">发送</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="option-note">隐藏侧栏，顶栏加角色下拉入口。省空间但结构变了</div>
+    </div>
+
+    <!-- Option C: Shrink -->
+    <div class="card">
+      <div class="option-label">C. 单角色时缩小</div>
+      <div class="chat" style="width:240px; height:200px;">
+        <div class="title-bar">
+          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          <span class="name">小桃</span>
+          <div class="mascot">🐱</div>
+        </div>
+        <div class="chat-body">
+          <div class="sidebar" style="width:22px; padding-top:6px; gap:4px;">
+            <div class="avatar active" style="width:16px;height:16px;"></div>
+            <div class="add-avatar" style="width:16px;height:16px;line-height:16px;font-size:8px;">+</div>
+          </div>
+          <div class="chat-area">
+            <div class="messages">
+              <div class="bubble ai">你好呀~</div>
+              <div class="bubble user">今天天气不错</div>
+              <div class="bubble ai">是呢！</div>
+            </div>
+            <div class="input-bar">
+              <input type="text" placeholder="输入..." disabled>
+              <span class="send-btn">发送</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="option-note">侧栏缩到22px，放迷你头像。多角色时恢复到52px</div>
+    </div>
+
+    <!-- Option D: Mascot as avatar -->
+    <div class="card">
+      <div class="option-label">D. 无侧栏，桌宠即头像</div>
+      <div class="chat" style="width:240px; height:200px;">
+        <div class="title-bar">
+          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          <div class="avatar" style="width:16px;height:16px;background:#FFE0D8;"></div>
+          <span class="name">小桃</span>
+          <span style="margin-left:auto;font-size:8px;color:#ccc;">+</span>
+          <div class="mascot">🐱</div>
+        </div>
+        <div class="chat-body">
+          <div class="chat-area">
+            <div class="messages">
+              <div class="bubble ai">你好呀~</div>
+              <div class="bubble user">今天天气不错</div>
+              <div class="bubble ai">是呢！</div>
+              <div class="bubble ai">要不要出去走走？</div>
+            </div>
+            <div class="input-bar">
+              <input type="text" placeholder="输入..." disabled>
+              <span class="send-btn">发送</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="option-note">彻底去掉侧栏，顶栏小头像 + 加号。最省空间</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ====== SECTION 2: L2 -> L3 TRANSITION ====== -->
+<h2>问题二：Level 2 → Level 3，设置怎么出来？</h2>
+
+<div class="section">
+  <div class="row">
+
+    <!-- Option A: Replace content -->
+    <div class="card">
+      <div class="option-label">A. 替换聊天区内容</div>
+      <div class="chat" style="width:260px; height:260px;">
+        <div class="title-bar">
+          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          <span class="name">设置</span>
+          <span style="margin-left:auto;font-size:7px;color:#E8927C;">← 返回</span>
+          <div class="mascot">🐱</div>
+        </div>
+        <div class="chat-body">
+          <div class="sidebar" style="width:28px;">
+            <div class="avatar active" style="width:18px;height:18px;"></div>
+            <div class="avatar" style="width:18px;height:18px;background:#D4EDE8;"></div>
+          </div>
+          <div class="settings-inline">
+            <div class="tabs">
+              <span class="tab active">角色</span>
+              <span class="tab">AI</span>
+              <span class="tab">外观</span>
+              <span class="tab">声音</span>
+            </div>
+            <div class="setting-row"><span class="setting-label">角色名</span><span class="setting-val">小桃</span></div>
+            <div class="setting-row"><span class="setting-label">性格</span><span class="setting-val">温柔可爱</span></div>
+            <div class="setting-row"><span class="setting-label">头像</span><span class="setting-val">点击更换</span></div>
+            <div class="setting-row"><span class="setting-label">立绘</span><span class="setting-val">点击更换</span></div>
+            <div style="margin-top:auto;font-size:9px;color:#ccc;text-align:center;">角色编辑区 · 更多设置</div>
+          </div>
+        </div>
+      </div>
+      <div class="option-note">聊天内容被覆盖。退出设置后恢复聊天。单窗口干净，但聊天被打断</div>
+    </div>
+
+    <!-- Option B: Floating popup -->
+    <div class="card">
+      <div class="option-label">B. 独立弹窗，浮在聊天上方</div>
+      <div class="chat settings-overlay" style="width:260px; height:260px;">
+        <div class="title-bar">
+          <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          <span class="name">小桃</span>
+          <div class="mascot">🐱</div>
+        </div>
+        <div class="chat-body">
+          <div class="sidebar" style="width:28px;">
+            <div class="avatar active" style="width:18px;height:18px;"></div>
+            <div class="avatar" style="width:18px;height:18px;background:#D4EDE8;"></div>
+          </div>
+          <div class="chat-area">
+            <div class="messages">
+              <div class="bubble ai">你好呀~</div>
+              <div class="bubble user">今天天气不错</div>
+              <div class="bubble ai">是呢！</div>
+            </div>
+            <div class="input-bar">
+              <input type="text" placeholder="输入..." disabled>
+              <span class="send-btn">发送</span>
+            </div>
+          </div>
+        </div>
+        <!-- Settings popup floating over -->
+        <div class="settings-popup" style="top:20px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-weight:600;color:#333;">设置</span>
+            <span style="font-size:10px;color:#ccc;cursor:pointer;">✕</span>
+          </div>
+          <div class="setting-row"><span class="setting-label">角色编辑</span><span class="setting-val">→</span></div>
+          <div class="setting-row"><span class="setting-label">AI 设置</span><span class="setting-val">→</span></div>
+          <div class="setting-row"><span class="setting-label">界面主题</span><span class="setting-val">暖桃</span></div>
+          <div class="setting-row"><span class="setting-label">显示密度</span><span class="setting-val">舒适</span></div>
+          <div class="setting-row" style="border:none;"><span class="setting-label">关于</span><span class="setting-val">v1.0</span></div>
+        </div>
+      </div>
+      <div class="option-note">类似QQ设置窗口，遮住聊天但不用切换。关掉即回到聊天</div>
+    </div>
+
+    <!-- Option C: Popup + auto-minimize -->
+    <div class="card">
+      <div class="option-label">C. 弹窗 + 聊天窗口自动最小化</div>
+      <div style="display:flex; gap:10px; align-items:flex-start;">
+        <div style="background:#fff;border-radius:8px;padding:8px 12px;box-shadow:0 3px 14px rgba(0,0,0,0.1);font-size:10px;min-width:140px;">
+          <div style="font-weight:600;color:#333;margin-bottom:6px;">设置</div>
+          <div class="setting-row"><span class="setting-label">角色编辑</span><span class="setting-val">→</span></div>
+          <div class="setting-row"><span class="setting-label">AI 设置</span><span class="setting-val">→</span></div>
+          <div class="setting-row"><span class="setting-label">界面主题</span><span class="setting-val">暖桃</span></div>
+          <div class="setting-row"><span class="setting-label">显示密度</span><span class="setting-val">舒适</span></div>
+          <div class="setting-row" style="border:none;"><span class="setting-label">关于</span><span class="setting-val">v1.0</span></div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:9px;color:#999;margin-bottom:4px;">聊天窗口 → 最小化</div>
+          <div style="background:#fff;border-radius:4px;padding:6px 10px;box-shadow:0 1px 6px rgba(0,0,0,0.08);font-size:9px;color:#888;display:flex;align-items:center;gap:4px;">
+            <div class="avatar" style="width:14px;height:14px;background:#FFE0D8;"></div>
+            小桃 · 聊天中
+          </div>
+        </div>
+      </div>
+      <div class="option-note">设置弹窗出现时，聊天窗口自动收进任务栏。关设置后恢复</div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
