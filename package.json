@@ -10,11 +10,11 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
-    "sql.js": "^1.12.0",
     "electron-store": "^10.0.0",
     "framer-motion": "^11.15.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "sql.js": "^1.12.0",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
