@@ -1,16 +1,20 @@
+import PetWindow from './components/PetWindow'
+import SettingsWindow from './components/SettingsWindow'
+import ChatWindow from './components/ChatWindow'
+
 function App() {
-  return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      height: '100vh',
-      fontFamily: '"Microsoft YaHei", "Segoe UI", system-ui, sans-serif',
-      color: '#555',
-    }}>
-      AI 伴侣 — 开发中
-    </div>
-  )
+  const hash = window.location.hash
+
+  if (hash === '#/pet') {
+    return <PetWindow />
+  }
+
+  if (hash === '#/settings') {
+    return <SettingsWindow />
+  }
+
+  // 默认：聊天窗口
+  return <ChatWindow />
 }
 
 export default App
