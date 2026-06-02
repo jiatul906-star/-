@@ -1,29 +1,155 @@
-import { useEffect, useState } from 'react'
-import type { PetAction } from '../../common/types'
+import { useEffect, useState, useCallback, useMemo } from 'react'
+import type { PetAction, CharacterConfig } from '../../common/types'
 import { DEFAULT_PET_ACTIONS } from '../../common/types'
+import { usePetStore } from '../stores/pet-store'
 import ActionEditor from './ActionEditor'
 import './settings.css'
 
 type NavKey = 'appearance' | 'actions' | 'about'
 
-const CHARACTERS = [
-  { id: '1', name: '小桃', gradient: 'linear-gradient(135deg, #F5D5C8, #E8B8A8)' },
-  { id: '2', name: '未命名', gradient: 'linear-gradient(135deg, #C8DCF5, #A8C8E8)' },
+// 新建角色的随机渐变色板
+const GRADIENT_PALETTE = [
+  'linear-gradient(175deg, #FDD9C4 0%, #F2B8A0 40%, #E8A38B 100%)', // 桃粉
+  'linear-gradient(175deg, #C8DCF5 0%, #B0C8E8 40%, #A8C8E8 100%)', // 天蓝
+  'linear-gradient(175deg, #D4E8D0 0%, #B8D8B4 40%, #A0C898 100%)', // 薄荷绿
+  'linear-gradient(175deg, #F8E0D0 0%, #F0CCB8 40%, #E8B898 100%)', // 奶茶
+  'linear-gradient(175deg, #E8D8F0 0%, #D0C0E0 40%, #C0A8D8 100%)', // 薰衣草
+  'linear-gradient(175deg, #F8F0C8 0%, #F0E8B0 40%, #E8D898 100%)', // 奶油黄
+  'linear-gradient(175deg, #F8D0D8 0%, #F0B8C4 40%, #E8A0B0 100%)', // 樱花粉
 ]
 
+function generateId(): string {
+  return 'char_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7)
+}
+
+function randomName(): string {
+  const names = ['小桃', '小蓝', '小绿', '小茶', '小紫', '小黄', '小樱', '小白', '小灰', '未命名']
+  return names[Math.floor(Math.random() * names.length)]
+}
+
 export default function SettingsWindow() {
-  const [activeChar, setActiveChar] = useState(CHARACTERS[0])
+  const {
+    characters,
+    activeCharacterId,
+    setCharactersData,
+    setActiveCharacterId,
+    addCharacter,
+    updateCharacter,
+    removeCharacter,
+    setCharacterImage,
+  } = usePetStore()
+
   const [activeTab, setActiveTab] = useState<'look' | 'soul' | 'voice'>('look')
   const [nav, setNav] = useState<NavKey>('appearance')
   const [actions, setActions] = useState<PetAction[]>([])
   const [saved, setSaved] = useState(false)
-  const [name, setName] = useState(activeChar.name)
+  const [name, setName] = useState('')
+  const [petImagePreview, setPetImagePreview] = useState<string | null>(null)
 
+  const activeChar = useMemo(
+    () => characters.find((c) => c.id === activeCharacterId) ?? characters[0] ?? null,
+    [characters, activeCharacterId],
+  )
+
+  // 初始化：加载角色 + 动作
   useEffect(() => {
+    window.electronAPI.getCharacters().then(setCharactersData)
     window.electronAPI.getPetActions().then((list) => {
       setActions(list.length > 0 ? list : DEFAULT_PET_ACTIONS)
     })
-  }, [])
+
+    const unsubChars = window.electronAPI.onCharactersUpdated(setCharactersData)
+    const unsubImage = window.electronAPI.onPetImageUpdated(({ charId, dataUrl }) => {
+      setCharacterImage(charId, dataUrl)
+    })
+
+    return () => {
+      unsubChars()
+      unsubImage()
+    }
+  }, [setCharactersData, setCharacterImage])
+
+  // 切换角色时更新表单
+  useEffect(() => {
+    if (activeChar) {
+      setName(activeChar.name)
+      setPetImagePreview(activeChar.imageDataUrl)
+    }
+  }, [activeChar?.id])
+
+  // ===== 保存到磁盘 =====
+  const persist = useCallback(
+    (chars: CharacterConfig[], activeId: string) => {
+      window.electronAPI.saveCharacters({ characters: chars, activeId })
+    },
+    [],
+  )
+
+  // ===== 角色操作 =====
+  const handleSelectChar = useCallback(
+    (id: string) => {
+      setActiveCharacterId(id)
+    },
+    [setActiveCharacterId],
+  )
+
+  const handleNewChar = useCallback(() => {
+    const g = GRADIENT_PALETTE[Math.floor(Math.random() * GRADIENT_PALETTE.length)]
+    const newChar: CharacterConfig = {
+      id: generateId(),
+      name: randomName(),
+      gradient: g,
+      imageDataUrl: null,
+      personality: '',
+      voiceId: '',
+      speechStyle: '',
+    }
+    addCharacter(newChar)
+    const all = [...characters, newChar]
+    persist(all, newChar.id)
+  }, [characters, addCharacter, persist])
+
+  const handleDeleteChar = useCallback(() => {
+    if (!activeChar || characters.length <= 1) return
+    removeCharacter(activeChar.id)
+    const next = characters.filter((c) => c.id !== activeChar.id)
+    persist(next, next[0]?.id ?? '')
+  }, [activeChar, characters, removeCharacter, persist])
+
+  const handleNameChange = useCallback(
+    (newName: string) => {
+      setName(newName)
+      if (!activeChar) return
+      const updated = { ...activeChar, name: newName }
+      updateCharacter(updated)
+      const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
+      persist(all, activeCharacterId)
+    },
+    [activeChar, characters, activeCharacterId, updateCharacter, persist],
+  )
+
+  const handleUploadImage = useCallback(async () => {
+    if (!activeChar) return
+    const dataUrl = await window.electronAPI.openImageDialog(activeChar.id)
+    if (dataUrl) {
+      setCharacterImage(activeChar.id, dataUrl)
+      setPetImagePreview(dataUrl)
+      const updated = { ...activeChar, imageDataUrl: dataUrl }
+      updateCharacter(updated)
+      const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
+      persist(all, activeCharacterId)
+    }
+  }, [activeChar, characters, activeCharacterId, updateCharacter, setCharacterImage, persist])
+
+  const handleClearImage = useCallback(() => {
+    if (!activeChar) return
+    setCharacterImage(activeChar.id, null)
+    setPetImagePreview(null)
+    const updated = { ...activeChar, imageDataUrl: null }
+    updateCharacter(updated)
+    const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
+    persist(all, activeCharacterId)
+  }, [activeChar, characters, activeCharacterId, updateCharacter, setCharacterImage, persist])
 
   const handleSaveActions = async (updated: PetAction[]) => {
     setActions(updated)
@@ -34,30 +160,35 @@ export default function SettingsWindow() {
 
   return (
     <div className="settings-window">
-      {/* 标题栏 */}
       <div className="settings-titlebar">
         设置
-        <button className="close-btn" onClick={() => window.electronAPI.close()} title="关闭">
-          ✕
-        </button>
+        <button className="close-btn" onClick={() => window.electronAPI.close()} title="关闭">✕</button>
       </div>
 
-      {/* 主体 */}
       <div className="settings-body">
         {/* 左侧栏 */}
         <div className="settings-sidebar">
           <div className="section-label">角色</div>
-          {CHARACTERS.map((c) => (
+          {characters.map((c) => (
             <button
               key={c.id}
-              className={`char-item${c.id === activeChar.id ? ' active' : ''}`}
-              onClick={() => { setActiveChar(c); setName(c.name) }}
+              className={`char-item${c.id === activeCharacterId ? ' active' : ''}`}
+              onClick={() => handleSelectChar(c.id)}
             >
               <div className="dot" style={{ background: c.gradient }} />
-              {c.name}
+              <span className="char-item-name">{c.name}</span>
+              {characters.length > 1 && c.id === activeCharacterId && (
+                <button
+                  className="char-delete-btn"
+                  onClick={(e) => { e.stopPropagation(); handleDeleteChar() }}
+                  title="删除角色"
+                >
+                  ×
+                </button>
+              )}
             </button>
           ))}
-          <button className="char-item add-new">
+          <button className="char-item add-new" onClick={handleNewChar}>
             <div className="dot">+</div>
             新建角色
           </button>
@@ -81,7 +212,7 @@ export default function SettingsWindow() {
 
         {/* 右侧内容 */}
         <div className="settings-content">
-          {nav === 'appearance' && (
+          {nav === 'appearance' && activeChar && (
             <>
               <h3>编辑角色 · {activeChar.name}</h3>
               <p className="subtitle">自定义角色的外观、性格和声音</p>
@@ -105,13 +236,23 @@ export default function SettingsWindow() {
                     <input
                       type="text"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => handleNameChange(e.target.value)}
                     />
                   </div>
                   <div className="form-group">
                     <label>角色头像 / 立绘</label>
-                    <div className="avatar-placeholder">点击上传</div>
-                    <div className="hint">支持 JPG/PNG，建议 1:1 比例</div>
+                    {petImagePreview ? (
+                      <div className="pet-image-preview-area">
+                        <img className="pet-image-preview" src={petImagePreview} alt="桌宠形象预览" />
+                        <div className="pet-image-actions">
+                          <button className="pet-image-change-btn" onClick={handleUploadImage}>更换图片</button>
+                          <button className="pet-image-reset-btn" onClick={handleClearImage}>使用默认形象</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button className="avatar-upload-btn" onClick={handleUploadImage}>点击上传</button>
+                    )}
+                    <div className="hint">支持 JPG/PNG/GIF，建议 1:1 比例</div>
                   </div>
                 </>
               )}
@@ -131,7 +272,6 @@ export default function SettingsWindow() {
                 </div>
               )}
 
-              {/* API 配置 */}
               <div className="form-group" style={{ borderTop: '1px solid rgba(0,0,0,0.04)', paddingTop: 14, marginTop: 8 }}>
                 <label>AI API 地址</label>
                 <input type="text" placeholder="https://api.openai.com/v1" />
@@ -165,15 +305,9 @@ export default function SettingsWindow() {
             <div className="about-section">
               <h3>关于 AI 伴侣</h3>
               <p className="subtitle">桌面宠物 + AI 聊天伴侣</p>
-              <p>
-                <strong>版本：</strong>0.1.0
-              </p>
-              <p>
-                <strong>技术栈：</strong>Electron + React + TypeScript
-              </p>
-              <p>
-                <strong>功能：</strong>桌宠互动 · AI 聊天 · 角色自定义
-              </p>
+              <p><strong>版本：</strong>0.1.0</p>
+              <p><strong>技术栈：</strong>Electron + React + TypeScript</p>
+              <p><strong>功能：</strong>桌宠互动 · AI 聊天 · 角色自定义</p>
             </div>
           )}
         </div>

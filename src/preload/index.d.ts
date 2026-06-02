@@ -1,4 +1,4 @@
-import type { PetAction } from '../common/types'
+import type { PetAction, CharactersData } from '../common/types'
 
 declare global {
   interface Window {
@@ -14,6 +14,12 @@ declare global {
       openChat: () => Promise<void>
       openSettings: () => Promise<void>
       openVideoDialog: () => Promise<string | null>
+      getCharacters: () => Promise<CharactersData>
+      saveCharacters: (data: CharactersData) => Promise<void>
+      onCharactersUpdated: (callback: (data: CharactersData) => void) => () => void
+      openImageDialog: (charId: string) => Promise<string | null>
+      getPetImage: (charId: string) => Promise<string | null>
+      onPetImageUpdated: (callback: (payload: { charId: string; dataUrl: string | null }) => void) => () => void
     }
   }
 }

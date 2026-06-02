@@ -96,6 +96,7 @@ function bootstrap() {
     getPetWindow: () => petWindow,
     getChatWindow: () => chatWindow,
     getOrCreateSettingsWindow,
+    getAllWindows: () => [chatWindow, petWindow, settingsWindow].filter(Boolean) as BrowserWindow[],
   })
 }
 

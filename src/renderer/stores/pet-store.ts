@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { PetAction } from '../../common/types'
+import type { PetAction, CharacterConfig, CharactersData } from '../../common/types'
 
 interface PetState {
   // 径向菜单
@@ -18,12 +18,24 @@ interface PetState {
   feedbackEmoji: string | null
   feedbackLabel: string | null
 
-  // 操作
+  // 角色系统
+  characters: CharacterConfig[]
+  activeCharacterId: string
+
+  // 操作 — 动作
   setActions: (actions: PetAction[]) => void
   openMenu: (originX: number, originY: number) => void
   closeMenu: () => void
   triggerAction: (action: PetAction) => void
   clearVideo: () => void
+
+  // 操作 — 角色
+  setCharactersData: (data: CharactersData) => void
+  setActiveCharacterId: (id: string) => void
+  updateCharacter: (char: CharacterConfig) => void
+  addCharacter: (char: CharacterConfig) => void
+  removeCharacter: (id: string) => void
+  setCharacterImage: (charId: string, dataUrl: string | null) => void
 }
 
 export const usePetStore = create<PetState>((set, get) => ({
@@ -35,12 +47,13 @@ export const usePetStore = create<PetState>((set, get) => ({
   videoVisible: false,
   feedbackEmoji: null,
   feedbackLabel: null,
+  characters: [],
+  activeCharacterId: '',
 
   setActions: (actions) => set({ actions }),
 
   openMenu: (originX, originY) => {
     const { menuVisible } = get()
-    // 已打开则先关再开（新位置）
     if (menuVisible) {
       set({ menuVisible: false })
       setTimeout(() => set({ menuVisible: true, menuOriginX: originX, menuOriginY: originY }), 150)
@@ -63,7 +76,6 @@ export const usePetStore = create<PetState>((set, get) => ({
       return
     }
 
-    // 有视频 → 播放
     if (action.videoPath) {
       set({
         currentVideo: `file:///${action.videoPath.replace(/\\/g, '/')}`,
@@ -71,7 +83,6 @@ export const usePetStore = create<PetState>((set, get) => ({
         menuVisible: false,
       })
     } else {
-      // 无视频 → emoji 反馈
       set({
         feedbackEmoji: action.emoji,
         feedbackLabel: action.label,
@@ -82,4 +93,37 @@ export const usePetStore = create<PetState>((set, get) => ({
   },
 
   clearVideo: () => set({ videoVisible: false, currentVideo: null }),
+
+  // ===== 角色操作 =====
+  setCharactersData: (data) =>
+    set({ characters: data.characters, activeCharacterId: data.activeId }),
+
+  setActiveCharacterId: (id) => set({ activeCharacterId: id }),
+
+  updateCharacter: (char) =>
+    set((s) => ({
+      characters: s.characters.map((c) => (c.id === char.id ? char : c)),
+    })),
+
+  addCharacter: (char) =>
+    set((s) => ({
+      characters: [...s.characters, char],
+      activeCharacterId: char.id,
+    })),
+
+  removeCharacter: (id) =>
+    set((s) => {
+      const next = s.characters.filter((c) => c.id !== id)
+      const activeId = id === s.activeCharacterId
+        ? (next[0]?.id ?? '')
+        : s.activeCharacterId
+      return { characters: next, activeCharacterId: activeId }
+    }),
+
+  setCharacterImage: (charId, dataUrl) =>
+    set((s) => ({
+      characters: s.characters.map((c) =>
+        c.id === charId ? { ...c, imageDataUrl: dataUrl } : c,
+      ),
+    })),
 }))

@@ -1,9 +1,9 @@
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import { usePetStore } from '../stores/pet-store'
 import RadialMenu from './RadialMenu'
 import './pet.css'
 
-const DRAG_THRESHOLD = 3 // 像素，超过此值视为拖拽
+const DRAG_THRESHOLD = 3
 
 export default function PetWindow() {
   const characterRef = useRef<HTMLDivElement>(null)
@@ -16,28 +16,55 @@ export default function PetWindow() {
     videoVisible,
     feedbackEmoji,
     feedbackLabel,
+    characters,
+    activeCharacterId,
     setActions,
+    setCharactersData,
+    setActiveCharacterId,
+    setCharacterImage,
     openMenu,
     closeMenu,
     triggerAction,
     clearVideo,
   } = usePetStore()
 
+  // 当前角色
+  const activeChar = useMemo(
+    () => characters.find((c) => c.id === activeCharacterId) ?? characters[0] ?? null,
+    [characters, activeCharacterId],
+  )
+
   // 拖拽状态
   const [dragging, setDragging] = useState(false)
   const dragRef = useRef({
-    active: false,           // 正在拖拽中
-    confirmed: false,        // 已超过阈值，确认拖拽
+    active: false,
+    confirmed: false,
     startScreenX: 0,
     startScreenY: 0,
     lastScreenX: 0,
     lastScreenY: 0,
   })
 
-  // 加载动作
+  // 初始化：加载动作 + 角色列表 + active 角色形象
   useEffect(() => {
     window.electronAPI.getPetActions().then(setActions)
-  }, [setActions])
+    window.electronAPI.getCharacters().then((data) => {
+      setCharactersData(data)
+    })
+
+    const unsubChars = window.electronAPI.onCharactersUpdated((data) => {
+      setCharactersData(data)
+    })
+
+    const unsubImage = window.electronAPI.onPetImageUpdated(({ charId, dataUrl }) => {
+      setCharacterImage(charId, dataUrl)
+    })
+
+    return () => {
+      unsubChars()
+      unsubImage()
+    }
+  }, [setActions, setCharactersData, setCharacterImage])
 
   // 右键 → 打开径向菜单
   const onContextMenu = useCallback(
@@ -54,12 +81,9 @@ export default function PetWindow() {
     [openMenu],
   )
 
-  // 鼠标按下 → 记录起始位置，准备拖拽
   const onMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      // 右键不处理拖拽
       if (e.button === 2) return
-
       e.preventDefault()
       const d = dragRef.current
       d.active = true
@@ -72,51 +96,33 @@ export default function PetWindow() {
     [],
   )
 
-  // 鼠标移动 → 计算 delta，移动窗口
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       const d = dragRef.current
       if (!d.active) return
-
       const dx = e.screenX - d.lastScreenX
       const dy = e.screenY - d.lastScreenY
-
-      // 检查是否超过拖拽阈值
       if (!d.confirmed) {
         const totalDx = e.screenX - d.startScreenX
         const totalDy = e.screenY - d.startScreenY
-        if (Math.abs(totalDx) < DRAG_THRESHOLD && Math.abs(totalDy) < DRAG_THRESHOLD) {
-          return
-        }
+        if (Math.abs(totalDx) < DRAG_THRESHOLD && Math.abs(totalDy) < DRAG_THRESHOLD) return
         d.confirmed = true
         setDragging(true)
       }
-
-      // 移动窗口
       if (dx !== 0 || dy !== 0) {
         d.lastScreenX = e.screenX
         d.lastScreenY = e.screenY
         window.electronAPI.movePet(dx, dy)
       }
     }
-
     const onUp = (e: MouseEvent) => {
       const d = dragRef.current
       if (!d.active) return
-
       d.active = false
-
-      // 未超过阈值 = 点击，执行原点击逻辑
-      if (!d.confirmed) {
-        if (videoVisible) {
-          clearVideo()
-        }
-      }
-
+      if (!d.confirmed && videoVisible) clearVideo()
       d.confirmed = false
       setDragging(false)
     }
-
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
     return () => {
@@ -125,18 +131,24 @@ export default function PetWindow() {
     }
   }, [videoVisible, clearVideo])
 
+  const showCustomImage = !!activeChar?.imageDataUrl
+
   return (
     <div className="pet-window">
-      {/* 角色 */}
       <div
         ref={characterRef}
         className={`pet-character${dragging ? ' dragging' : ''}`}
         onContextMenu={onContextMenu}
         onMouseDown={onMouseDown}
       >
-        {/* 默认形象 */}
-        {!videoVisible && (
-          <div className="pet-body">
+        {/* 自定义形象图片 */}
+        {showCustomImage && !videoVisible && (
+          <img className="pet-image" src={activeChar!.imageDataUrl!} alt={activeChar!.name} />
+        )}
+
+        {/* 默认 CSS 形象 */}
+        {!showCustomImage && !videoVisible && activeChar && (
+          <div className="pet-body" style={{ background: activeChar.gradient }}>
             <div className="pet-face">
               <div className="pet-eyes">
                 <div className="pet-eye left" />
@@ -144,13 +156,14 @@ export default function PetWindow() {
               </div>
               <div className="pet-mouth" />
             </div>
-            {/* emoji 反馈 */}
-            {feedbackEmoji && (
-              <div className="pet-feedback">
-                <span className="feedback-emoji">{feedbackEmoji}</span>
-                <span className="feedback-label">{feedbackLabel}</span>
-              </div>
-            )}
+          </div>
+        )}
+
+        {/* emoji 反馈 */}
+        {!videoVisible && feedbackEmoji && (
+          <div className="pet-feedback">
+            <span className="feedback-emoji">{feedbackEmoji}</span>
+            <span className="feedback-label">{feedbackLabel}</span>
           </div>
         )}
 
@@ -167,16 +180,12 @@ export default function PetWindow() {
                 feedbackEmoji: '❌',
                 feedbackLabel: '视频加载失败',
               })
-              setTimeout(
-                () => usePetStore.setState({ feedbackEmoji: null, feedbackLabel: null }),
-                2000,
-              )
+              setTimeout(() => usePetStore.setState({ feedbackEmoji: null, feedbackLabel: null }), 2000)
             }}
           />
         )}
       </div>
 
-      {/* 径向菜单 */}
       <RadialMenu
         actions={actions}
         visible={menuVisible}
@@ -186,7 +195,6 @@ export default function PetWindow() {
         onClose={closeMenu}
       />
 
-      {/* 右键提示 */}
       {!menuVisible && actions.length === 0 && (
         <div className="hint-text">右键角色 — 动作菜单</div>
       )}
