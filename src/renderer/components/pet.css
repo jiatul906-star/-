@@ -1,0 +1,162 @@
+/* ===== 桌宠窗口整体 ===== */
+.pet-window {
+  width: 100vw;
+  height: 100vh;
+  user-select: none;
+  -webkit-app-region: no-drag;
+  overflow: hidden;
+}
+
+/* ===== 角色容器 ===== */
+.pet-character {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 180px;
+  cursor: grab;
+  pointer-events: auto;
+  z-index: 10;
+}
+
+.pet-character:active {
+  transform: translateX(-50%) scale(0.95);
+}
+
+.pet-character.dragging {
+  cursor: grabbing;
+  transform: translateX(-50%) scale(1.02);
+}
+
+/* ===== 身体 ===== */
+.pet-body {
+  position: relative;
+  width: 110px;
+  height: 142px;
+  margin: 16px auto 0;
+  /* background 由 JSX inline style 控制（角色 gradient） */
+  border-radius: 60px 60px 20px 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+/* ===== 脸 ===== */
+.pet-face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ===== 眼睛 ===== */
+.pet-eyes {
+  display: flex;
+  gap: 22px;
+}
+
+.pet-eye {
+  width: 12px;
+  height: 14px;
+  background: #3C3C3C;
+  border-radius: 50%;
+  animation: petBlink 3s ease-in-out infinite;
+}
+
+.pet-eye.left {
+  animation-delay: 0s;
+}
+
+.pet-eye.right {
+  animation-delay: 0.15s;
+}
+
+@keyframes petBlink {
+  0%, 90%, 100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+
+/* ===== 嘴巴 ===== */
+.pet-mouth {
+  width: 16px;
+  height: 8px;
+  border-bottom: 3px solid #3C3C3C;
+  border-radius: 0 0 50% 50%;
+}
+
+/* ===== 自定义形象图片 ===== */
+.pet-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+/* ===== 视频层 ===== */
+.pet-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+/* ===== emoji 反馈 ===== */
+.pet-feedback {
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  animation: feedbackPop 0.3s ease-out;
+  pointer-events: none;
+}
+
+@keyframes feedbackPop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+.feedback-emoji {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.feedback-label {
+  font-size: 12px;
+  color: #555;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 2px 10px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
+}
+
+/* ===== 提示文字 ===== */
+.hint-text {
+  position: absolute;
+  bottom: 20px;
+  width: 100%;
+  text-align: center;
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}

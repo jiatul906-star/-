@@ -1,0 +1,345 @@
+/* ===== 聊天窗口整体 ===== */
+.chat-window {
+  width: 100vw;
+  height: 100vh;
+  background: #FBF9F7;
+  font-family: "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+  color: #3C3C3C;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ===== 小角色骑边框 ===== */
+.chat-pet-on-border {
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70px;
+  height: 100px;
+  background: linear-gradient(180deg, #F5D5C8 0%, #E8B8A8 100%);
+  border-radius: 35px 35px 10px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  z-index: 10;
+  cursor: grab;
+  transition: transform 200ms ease-out;
+}
+
+.chat-pet-on-border:hover {
+  transform: translateX(-50%) scale(1.05);
+}
+
+.chat-pet-on-border:active {
+  cursor: grabbing;
+  transform: translateX(-50%) scale(0.95);
+}
+
+.chat-pet-face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.chat-pet-eyes {
+  display: flex;
+  gap: 10px;
+}
+
+.chat-pet-eye {
+  width: 7px;
+  height: 8px;
+  background: #3C3C3C;
+  border-radius: 50%;
+  top: -2px;
+  position: relative;
+  animation: chatEyeBlink 3s ease-in-out infinite;
+}
+
+.chat-pet-eye:last-child {
+  animation-delay: 0.15s;
+}
+
+@keyframes chatEyeBlink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+
+.chat-pet-mouth {
+  width: 10px;
+  height: 5px;
+  border-bottom: 2px solid #3C3C3C;
+  border-radius: 0 0 50% 50%;
+  position: relative;
+  top: 2px;
+}
+
+/* ===== 标题栏 ===== */
+.chat-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 16px 14px;
+  flex-shrink: 0;
+  -webkit-app-region: drag;
+}
+
+.chat-titlebar-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+
+.chat-titlebar-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.chat-titlebar-gear {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
+  color: #999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 100ms;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+
+.chat-titlebar-gear:hover {
+  background: #F5F3F1;
+}
+
+.chat-titlebar-actions {
+  flex: 1;
+  justify-content: flex-end;
+  display: flex;
+  gap: 4px;
+  -webkit-app-region: no-drag;
+}
+
+.chat-titlebar-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: #999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  transition: background 100ms;
+}
+
+.chat-titlebar-btn:hover {
+  background: #F5F3F1;
+}
+
+.chat-titlebar-btn.close:hover {
+  background: #FFE0D8;
+  color: #E8927C;
+}
+
+/* ===== 主体 ===== */
+.chat-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ===== 角色侧边栏 ===== */
+.chat-sidebar {
+  width: 60px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  border-right: 1px solid rgba(0, 0, 0, 0.04);
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.chat-char-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 150ms;
+  flex-shrink: 0;
+  position: relative;
+  padding: 0;
+}
+
+.chat-char-btn:hover {
+  transform: scale(1.05);
+}
+
+.chat-char-btn.active {
+  border-color: #E8927C;
+  box-shadow: 0 0 0 3px rgba(232, 146, 124, 0.2);
+}
+
+.chat-char-btn.add {
+  background: #F5F3F1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: #999;
+  border: 2px dashed #DDD;
+}
+
+.chat-char-btn.add:hover {
+  border-color: #E8927C;
+  color: #E8927C;
+}
+
+/* ===== 消息区 ===== */
+.chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #FBF9F7;
+  min-width: 0;
+}
+
+.chat-messages {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ===== 单条消息 ===== */
+.chat-msg {
+  display: flex;
+  gap: 8px;
+  max-width: 85%;
+  animation: chatMsgIn 250ms ease-out;
+}
+
+@keyframes chatMsgIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chat-msg.assistant {
+  align-self: flex-start;
+}
+
+.chat-msg.user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.chat-msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.chat-msg-bubble {
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #3C3C3C;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  word-break: break-word;
+}
+
+.chat-msg.assistant .chat-msg-bubble {
+  background: #F5F3F1;
+  border-bottom-left-radius: 4px;
+}
+
+.chat-msg.user .chat-msg-bubble {
+  background: #FFE0D8;
+  border-bottom-right-radius: 4px;
+}
+
+.chat-msg-time {
+  font-size: 11px;
+  color: #999;
+  margin-top: 3px;
+  padding: 0 4px;
+}
+
+/* ===== 输入区 ===== */
+.chat-input-area {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #FFFFFF;
+  border-top: 1px solid rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+}
+
+.chat-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #3C3C3C;
+  background: transparent;
+  min-height: 24px;
+  max-height: 120px;
+}
+
+.chat-input::placeholder {
+  color: #999;
+}
+
+.chat-btn-send {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: #E8927C;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 100ms;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+
+.chat-btn-send:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
