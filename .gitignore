@@ -4,3 +4,5 @@ dist/
 .env
 *.log
 tts-preview/*.mp3
+*.zip
+*.mp4
