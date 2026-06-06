@@ -218,9 +218,11 @@
 |------|---------|
 | `docs/vision.md` | 判断功能该不该做 |
 | `docs/features.md` | 功能范围 |
+| `docs/architecture.md` | **宪法核心**——技术栈、模块拆分、数据流、窗口架构、插件规范 |
+| `docs/interfaces.md` | **宪法核心**——IPC 通道、事件总线、数据类型、插件接口签名 |
 | `docs/design-system.md` | 所有 CSS 变量值、色值、间距、动效参数 |
 | `docs/ui-spec.md` | 交互逻辑、Level 1/2/3 规则 |
-| `specs/architecture-analysis.md` | 技术架构决策 |
+| `specs/architecture-analysis.md` | 架构决策过程（选 C 的原因） |
 | `specs/ui-implementation.md` | 组件树、IPC 通道、主题切换逻辑 |
 | `specs/animation-assets.md` | 桌宠素材规格 |
 | `specs/development-plan.md` | 本文档——整体开发计划 |
