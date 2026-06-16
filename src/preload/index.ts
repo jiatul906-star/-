@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   togglePetPassthrough: () => ipcRenderer.invoke('window:togglePetPassthrough'),
   movePet: (dx: number, dy: number): Promise<void> =>
     ipcRenderer.invoke('window:movePet', dx, dy),
+  resizePet: (expand: boolean, charWinX: number, charWinY: number): Promise<void> =>
+    ipcRenderer.invoke('window:resizePet', expand, charWinX, charWinY),
 
   // 动作持久化
   getPetActions: (): Promise<PetAction[]> => ipcRenderer.invoke('pet-actions:getAll'),
@@ -44,5 +46,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       callback(payload)
     ipcRenderer.on('pet-image:updated', listener)
     return () => ipcRenderer.removeListener('pet-image:updated', listener)
+  },
+
+  // 窗口失去焦点（主进程已缩窗，渲染进程只需关菜单状态）
+  onPetMenuClose: (callback: () => void): (() => void) => {
+    const listener = () => callback()
+    ipcRenderer.on('pet:menuClose', listener)
+    return () => ipcRenderer.removeListener('pet:menuClose', listener)
   },
 })

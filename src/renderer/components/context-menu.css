@@ -1,0 +1,88 @@
+/* ===== 背景遮罩 ===== */
+.context-backdrop {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+/* ===== 动作按钮 ===== */
+.ctx-action-btn {
+  border: none;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.16), 0 0 0 1px rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  pointer-events: auto;
+}
+
+.ctx-action-btn:hover {
+  background: #fff;
+  box-shadow: 0 3px 20px rgba(0, 0, 0, 0.25), 0 0 0 2px rgba(255, 255, 255, 0.6);
+}
+
+.ctx-action-emoji {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.ctx-action-label {
+  font-size: 9px;
+  color: #555;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ===== 聊天输入栏（窗口底部） ===== */
+.ctx-chat-bar {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.5);
+  padding: 0 8px;
+  pointer-events: auto;
+  z-index: 200;
+  WebkitAppRegion: no-drag;
+}
+
+.ctx-chat-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 12px;
+  color: #3C3C3C;
+  background: transparent;
+  font-family: inherit;
+}
+
+.ctx-chat-input::placeholder {
+  color: #aaa;
+}
+
+.ctx-chat-send {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: #E8927C;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ctx-chat-send:hover {
+  background: #d87a6a;
+}

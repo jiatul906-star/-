@@ -73,11 +73,71 @@ export function registerIpc(deps: IpcDeps) {
   })
 
   // ===== drag move pet window =====
+  // 当前正确尺寸（DWM 可能改写 getBounds 返回值，所以自己维护）
+  let petW = 160
+  let petH = 270
   ipcMain.handle('window:movePet', (_event, dx: number, dy: number) => {
     const win = getPetWindow()
     if (!win) return
     const [x, y] = win.getPosition()
-    win.setPosition(x + dx, y + dy)
+    win.setBounds({ x: x + dx, y: y + dy, width: petW, height: petH })
+  })
+
+  // ===== resize pet window (expand/shrink for context menu) =====
+  const SMALL = { w: 160, h: 270, charTop: 45, charH: 180 }
+  const LARGE = { w: 320, h: 400, charTop: 45, charH: 180 }
+  let blurShrink: (() => void) | null = null
+
+  ipcMain.handle('window:resizePet', (_event, expand: boolean, charWinX: number, charWinY: number) => {
+    const win = getPetWindow()
+    if (!win) return
+
+    // 移除旧的 blur 监听
+    if (blurShrink) {
+      win.off('blur', blurShrink)
+      blurShrink = null
+    }
+
+    const b = win.getBounds()
+    const charScreenX = b.x + charWinX
+    const charScreenY = b.y + charWinY
+    const sz = expand ? LARGE : SMALL
+    petW = sz.w
+    petH = sz.h
+    const charCenterX = sz.w / 2
+    const charCenterY = sz.charTop + sz.charH / 2
+    win.setMinimumSize(sz.w, sz.h)
+    win.setMaximumSize(sz.w, sz.h)
+    win.setBounds({
+      x: Math.round(charScreenX - charCenterX),
+      y: Math.round(charScreenY - charCenterY),
+      width: sz.w,
+      height: sz.h,
+    })
+
+    // 扩大时注册 blur 监听 — 点窗口外自动缩窗
+    if (expand) {
+      blurShrink = () => {
+        if (win.isDestroyed()) return
+        const b2 = win.getBounds()
+        const cx = b2.x + b2.width / 2
+        const cy = b2.y + sz.charTop + sz.charH / 2
+        petW = SMALL.w
+        petH = SMALL.h
+        win.setMinimumSize(SMALL.w, SMALL.h)
+        win.setMaximumSize(SMALL.w, SMALL.h)
+        win.setBounds({
+          x: Math.round(cx - SMALL.w / 2),
+          y: Math.round(cy - SMALL.charTop - SMALL.charH / 2),
+          width: SMALL.w,
+          height: SMALL.h,
+        })
+        win.webContents.send('pet:menuClose')
+        win.off('blur', blurShrink!)
+        blurShrink = null
+      }
+      win.on('blur', blurShrink)
+    }
   })
 
   // ===== file dialog: video =====

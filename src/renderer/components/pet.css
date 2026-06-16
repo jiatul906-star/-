@@ -1,32 +1,32 @@
 /* ===== 桌宠窗口整体 ===== */
 .pet-window {
+  position: fixed;
+  top: 0;
+  left: 0;
   width: 100vw;
   height: 100vh;
+  background: red;
   user-select: none;
-  -webkit-app-region: no-drag;
   overflow: hidden;
+  pointer-events: auto;
 }
 
 /* ===== 角色容器 ===== */
 .pet-character {
   position: absolute;
-  bottom: 60px;
+  top: 45px;
   left: 50%;
   transform: translateX(-50%);
   width: 120px;
   height: 180px;
   cursor: grab;
   pointer-events: auto;
-  z-index: 10;
-}
-
-.pet-character:active {
-  transform: translateX(-50%) scale(0.95);
+  z-index: 160;
+  -webkit-app-region: no-drag;
 }
 
 .pet-character.dragging {
   cursor: grabbing;
-  transform: translateX(-50%) scale(1.02);
 }
 
 /* ===== 身体 ===== */
