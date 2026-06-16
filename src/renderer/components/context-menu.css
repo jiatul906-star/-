@@ -35,12 +35,12 @@
   pointer-events: none;
 }
 
-/* ===== 聊天输入栏（窗口底部） ===== */
+/* ===== 聊天输入栏 ===== */
 .ctx-chat-bar {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
-  right: 8px;
+  bottom: 12px;
+  left: 16px;
+  right: 16px;
   height: 32px;
   display: flex;
   align-items: center;

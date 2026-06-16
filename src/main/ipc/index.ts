@@ -85,7 +85,7 @@ export function registerIpc(deps: IpcDeps) {
 
   // ===== resize pet window (expand/shrink for context menu) =====
   const SMALL = { w: 160, h: 270, charTop: 45, charH: 180 }
-  const LARGE = { w: 320, h: 400, charTop: 45, charH: 180 }
+  const LARGE = { w: 320, h: 310, charTop: 45, charH: 180 }
   let blurShrink: (() => void) | null = null
 
   ipcMain.handle('window:resizePet', (_event, expand: boolean, charWinX: number, charWinY: number) => {
