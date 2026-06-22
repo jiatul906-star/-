@@ -1,6 +1,8 @@
 import { useEffect, useRef, useCallback, useMemo, useState } from 'react'
 import { usePetStore } from '../stores/pet-store'
 import ContextMenu from './ContextMenu'
+import { streamChat, buildSystemPrompt } from '../plugins/chat/api'
+import type { ApiProfile, MemoryEntry } from '../../common/types'
 import './pet.css'
 import './context-menu.css'
 
@@ -32,6 +34,19 @@ export default function PetWindow() {
   const activeChar = useMemo(
     () => characters.find((c) => c.id === activeCharacterId) ?? characters[0] ?? null,
     [characters, activeCharacterId],
+  )
+
+  // ===== 右键聊天状态 =====
+  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
+  const [isChatStreaming, setIsChatStreaming] = useState(false)
+  const [apiProfiles, setApiProfiles] = useState<ApiProfile[]>([])
+  const [activeProfileId, setActiveProfileId] = useState<string>('')
+  const [memories, setMemories] = useState<MemoryEntry[]>([])
+  const chatAbortRef = useRef<AbortController | null>(null)
+
+  const activeProfile = useMemo(
+    () => apiProfiles.find((p) => p.id === activeProfileId) ?? apiProfiles[0] ?? null,
+    [apiProfiles, activeProfileId],
   )
 
   const [dragging, setDragging] = useState(false)
@@ -66,6 +81,25 @@ export default function PetWindow() {
     )
     return () => { unsubChars(); unsubImage() }
   }, [setActions, setCharactersData, setCharacterImage])
+
+  // ---- 加载 API Profiles + 记忆 ----
+  useEffect(() => {
+    window.electronAPI.getApiProfiles().then((data) => {
+      setApiProfiles(data.profiles)
+      setActiveProfileId(data.activeProfileId)
+    })
+    const unsub = window.electronAPI.onApiProfilesUpdated((data) => {
+      setApiProfiles(data.profiles)
+      setActiveProfileId(data.activeProfileId)
+    })
+    return () => unsub()
+  }, [])
+
+  useEffect(() => {
+    if (activeChar) {
+      window.electronAPI.getAgentMemory(activeChar.id).then(setMemories)
+    }
+  }, [activeChar?.id])
 
   // ---- 窗口失去焦点：主进程已缩窗，只需关闭菜单状态 ----
   useEffect(() => {
@@ -173,12 +207,72 @@ export default function PetWindow() {
   }, [videoVisible, clearVideo])
 
   const handleSendChat = useCallback(
-    (_text: string) => {
-      closeMenu()
-      window.electronAPI.openChat()
+    async (text: string) => {
+      // 添加用户消息
+      setChatMessages((prev) => [...prev, { role: 'user' as const, content: text }])
+
+      if (!activeChar) return
+
+      // 检查 API 配置
+      const profile = activeChar.apiProfileId
+        ? apiProfiles.find((p) => p.id === activeChar.apiProfileId) || activeProfile
+        : activeProfile
+      if (!profile || !profile.apiKey || !profile.baseUrl) {
+        setChatMessages((prev) => [...prev, { role: 'assistant' as const, content: '请先在设置的 API 页面配置 API Key 和地址。' }])
+        return
+      }
+
+      setIsChatStreaming(true)
+      const controller = new AbortController()
+      chatAbortRef.current = controller
+
+      try {
+        const systemPrompt = buildSystemPrompt(activeChar, memories)
+
+        let fullContent = ''
+        setChatMessages((prev) => [...prev, { role: 'assistant' as const, content: '' }])
+
+        for await (const token of streamChat(
+          [{ id: '', role: 'user', content: text, timestamp: Date.now(), characterId: activeChar.id }],
+          profile,
+          systemPrompt,
+          controller.signal,
+        )) {
+          fullContent += token
+          setChatMessages((prev) => {
+            const copy = [...prev]
+            const last = copy[copy.length - 1]
+            if (last && last.role === 'assistant') {
+              copy[copy.length - 1] = { ...last, content: fullContent }
+            }
+            return copy
+          })
+        }
+      } catch (err: any) {
+        if (err.name === 'AbortError') return
+        setChatMessages((prev) => {
+          const copy = [...prev]
+          const last = copy[copy.length - 1]
+          if (last && last.role === 'assistant') {
+            copy[copy.length - 1] = { ...last, content: last.content || '请求失败: ' + (err.message || '网络错误') }
+          }
+          return copy
+        })
+      } finally {
+        setIsChatStreaming(false)
+        chatAbortRef.current = null
+      }
     },
-    [closeMenu],
+    [activeChar, activeProfile, apiProfiles, memories],
   )
+
+  // 关闭菜单时停止流式输出 + 清空聊天状态
+  const handleCloseMenu = useCallback(() => {
+    chatAbortRef.current?.abort()
+    setChatMessages([])
+    setIsChatStreaming(false)
+    closeMenu()
+  }, [closeMenu])
 
   const showCustomImage = !!activeChar?.imageDataUrl
 
@@ -226,8 +320,11 @@ export default function PetWindow() {
         cx={menuOriginX}
         cy={menuOriginY}
         onAction={triggerAction}
-        onClose={closeMenu}
+        onClose={handleCloseMenu}
         onSendChat={handleSendChat}
+        chatMessages={chatMessages}
+        isChatStreaming={isChatStreaming}
+        charName={activeChar?.name ?? 'AI'}
       />
 
       {!menuVisible && actions.length === 0 && (

@@ -12,79 +12,12 @@
 }
 
 /* ===== 小角色骑边框 ===== */
-.chat-pet-on-border {
-  position: absolute;
-  top: -60px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 70px;
-  height: 100px;
-  background: linear-gradient(180deg, #F5D5C8 0%, #E8B8A8 100%);
-  border-radius: 35px 35px 10px 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  z-index: 10;
-  cursor: grab;
-  transition: transform 200ms ease-out;
-}
-
-.chat-pet-on-border:hover {
-  transform: translateX(-50%) scale(1.05);
-}
-
-.chat-pet-on-border:active {
-  cursor: grabbing;
-  transform: translateX(-50%) scale(0.95);
-}
-
-.chat-pet-face {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.chat-pet-eyes {
-  display: flex;
-  gap: 10px;
-}
-
-.chat-pet-eye {
-  width: 7px;
-  height: 8px;
-  background: #3C3C3C;
-  border-radius: 50%;
-  top: -2px;
-  position: relative;
-  animation: chatEyeBlink 3s ease-in-out infinite;
-}
-
-.chat-pet-eye:last-child {
-  animation-delay: 0.15s;
-}
-
-@keyframes chatEyeBlink {
-  0%, 90%, 100% { transform: scaleY(1); }
-  95% { transform: scaleY(0.1); }
-}
-
-.chat-pet-mouth {
-  width: 10px;
-  height: 5px;
-  border-bottom: 2px solid #3C3C3C;
-  border-radius: 0 0 50% 50%;
-  position: relative;
-  top: 2px;
-}
-
 /* ===== 标题栏 ===== */
 .chat-titlebar {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 18px 16px 14px;
+  padding: 10px 16px;
   flex-shrink: 0;
   -webkit-app-region: drag;
 }
@@ -342,4 +275,187 @@
 .chat-btn-send:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* ===== 停止按钮 ===== */
+.chat-btn-stop {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: #E8927C;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+
+/* ===== 流式光标 ===== */
+.chat-cursor {
+  display: inline-block;
+  animation: cursorBlink 1s step-end infinite;
+  color: #E8927C;
+  font-weight: 300;
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ===== 错误消息 ===== */
+.chat-msg.error .chat-msg-bubble {
+  background: #FFF0F0;
+  color: #D04040;
+  border: 1px solid #FFD0D0;
+}
+
+.chat-msg-avatar-error {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #FFD0D0;
+  color: #D04040;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* ===== 错误提示条 ===== */
+.chat-error-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: #FFF0F0;
+  border-bottom: 1px solid #FFD0D0;
+  font-size: 12px;
+  color: #D04040;
+  flex-shrink: 0;
+}
+
+.chat-error-bar button {
+  margin-left: auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #D04040;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===== API 选择器 ===== */
+.chat-api-selector {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+
+.chat-api-current {
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid #E0DDD8;
+  background: #FBF9F7;
+  font-family: inherit;
+  font-size: 11px;
+  color: #999;
+  cursor: pointer;
+  transition: all 100ms;
+}
+
+.chat-api-current:hover {
+  border-color: #E8927C;
+  color: #3C3C3C;
+}
+
+.chat-api-current .api-char-badge {
+  font-size: 11px;
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+.chat-api-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: #FFFFFF;
+  border: 1px solid #E0DDD8;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  min-width: 200px;
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 100;
+  padding: 4px;
+}
+
+.chat-api-option {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #3C3C3C;
+  transition: background 100ms;
+  background: none;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+}
+
+.chat-api-option:hover {
+  background: #F5F3F1;
+}
+
+.chat-api-option.active {
+  background: #FFE0D8;
+}
+
+.chat-api-option .api-opt-name {
+  font-weight: 500;
+}
+
+.chat-api-option .api-opt-model {
+  font-size: 10px;
+  color: #999;
+}
+
+.chat-api-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.04);
+  margin: 4px 0;
+}
+
+.chat-api-option.settings-link {
+  color: #999;
+  font-size: 11px;
+}
+
+.chat-api-option.settings-link:hover {
+  color: #E8927C;
+}
+
+.chat-api-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
 }

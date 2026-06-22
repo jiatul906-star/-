@@ -1,2 +1,2 @@
-// 插件占位 — 后续开发
-export { }
+// 聊天插件
+export { streamChat, chatOnce, buildSystemPrompt } from './api'

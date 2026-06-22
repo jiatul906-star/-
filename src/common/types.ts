@@ -8,6 +8,7 @@ export interface CharacterConfig {
   personality: string
   voiceId: string
   speechStyle: string
+  apiProfileId?: string    // 角色专属 API Profile ID，未设置则使用全局激活的 Profile
 }
 
 export interface CharactersData {
@@ -36,19 +37,90 @@ export const DEFAULT_CHARACTERS: CharacterConfig[] = [
   },
 ]
 
+// ===== 聊天消息 =====
+
 export interface ChatMessage {
   id: string
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'system'
   content: string
   timestamp: number
+  characterId: string  // 归属角色
 }
+
+// ===== API Profile（ccswitch 风格多配置） =====
+
+export interface ApiProfile {
+  id: string
+  name: string            // 显示名
+  baseUrl: string         // API endpoint
+  apiKey: string          // API Key
+  model: string           // 模型名
+  isActive: boolean       // 当前激活
+  maxTokens?: number
+  temperature?: number
+  createdAt: number
+  updatedAt: number
+}
+
+export interface ApiProfilesData {
+  profiles: ApiProfile[]
+  activeProfileId: string
+}
+
+/** 预置 API 模板（首次启动注入） */
+export const PRESET_API_PROFILES: Omit<ApiProfile, 'id' | 'apiKey' | 'isActive' | 'createdAt' | 'updatedAt'>[] = [
+  {
+    name: 'OpenAI 官方',
+    baseUrl: 'https://api.openai.com/v1',
+    model: 'gpt-4o',
+    maxTokens: 4096,
+    temperature: 0.7,
+  },
+  {
+    name: 'DeepSeek',
+    baseUrl: 'https://api.deepseek.com/v1',
+    model: 'deepseek-chat',
+    maxTokens: 4096,
+    temperature: 0.7,
+  },
+  {
+    name: '硅基流动',
+    baseUrl: 'https://api.siliconflow.cn/v1',
+    model: 'Qwen/Qwen2.5-7B-Instruct',
+    maxTokens: 4096,
+    temperature: 0.7,
+  },
+  {
+    name: '智谱 GLM',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    model: 'glm-4-flash',
+    maxTokens: 4096,
+    temperature: 0.7,
+  },
+  {
+    name: '通义千问',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    model: 'qwen-plus',
+    maxTokens: 4096,
+    temperature: 0.7,
+  },
+]
+
+// ===== 智能体记忆 =====
+
+export interface MemoryEntry {
+  id: string
+  content: string         // 记忆内容
+  source: 'ai-extracted' | 'user-explicit'
+  createdAt: number
+  updatedAt: number
+}
+
+// ===== 应用设置 =====
 
 export interface AppSettings {
   theme: 'warm-peach' | 'mint' | 'lavender' | 'milk-coffee' | 'sakura'
   density: 'comfortable' | 'compact'
-  apiUrl: string
-  apiKey: string
-  model: string
 }
 
 // ===== 桌宠动作系统 =====

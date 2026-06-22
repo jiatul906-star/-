@@ -387,3 +387,419 @@
   70% { opacity: 1; }
   100% { opacity: 0; }
 }
+
+/* ===== API Profile 管理 ===== */
+.api-layout {
+  display: flex;
+  gap: 16px;
+  min-height: 0;
+}
+
+.api-profile-list {
+  width: 180px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  max-height: 360px;
+}
+
+.api-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #3C3C3C;
+  transition: background 100ms;
+  background: none;
+  border: 1px solid transparent;
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+}
+
+.api-profile-card:hover {
+  background: #F5F3F1;
+}
+
+.api-profile-card.selected {
+  background: #F5F3F1;
+  border-color: #E0DDD8;
+}
+
+.api-profile-card.active {
+  border-color: #E8927C;
+}
+
+.api-profile-card.add-new {
+  color: #E8927C;
+  font-weight: 500;
+  border: 1px dashed #DDD;
+  justify-content: center;
+}
+
+.api-profile-card.add-new:hover {
+  border-color: #E8927C;
+  background: #FFF5F2;
+}
+
+.api-profile-indicator {
+  font-size: 10px;
+  color: #CCC;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.api-profile-card.active .api-profile-indicator {
+  color: #E8927C;
+}
+
+.api-profile-info {
+  min-width: 0;
+}
+
+.api-profile-name {
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.api-active-badge {
+  font-size: 10px;
+  background: #E8927C;
+  color: #FFF;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.api-profile-model {
+  font-size: 11px;
+  color: #999;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.api-profile-form {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.api-profile-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.api-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid #E0DDD8;
+  background: #FFFFFF;
+  font-family: inherit;
+  font-size: 12px;
+  color: #3C3C3C;
+  cursor: pointer;
+  transition: all 100ms;
+}
+
+.api-btn:hover {
+  border-color: #E8927C;
+}
+
+.api-btn.primary {
+  background: #E8927C;
+  color: #FFF;
+  border-color: #E8927C;
+}
+
+.api-btn.primary:hover {
+  background: #D8806A;
+}
+
+.api-btn.danger {
+  color: #C08878;
+}
+
+.api-btn.danger:hover {
+  border-color: #C08878;
+  background: #FFF5F2;
+}
+
+.api-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.test-result {
+  font-size: 12px;
+  margin-left: 12px;
+}
+
+.test-result.success {
+  color: #7DB8A8;
+}
+
+.test-result.fail {
+  color: #E8927C;
+}
+
+/* ===== 记忆管理 ===== */
+.memory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.memory-item {
+  background: #F5F3F1;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.memory-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+}
+
+.memory-text {
+  flex: 1;
+  font-size: 12px;
+  color: #3C3C3C;
+}
+
+.memory-row-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 100ms;
+}
+
+.memory-item:hover .memory-row-actions {
+  opacity: 1;
+}
+
+.memory-action {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  color: #999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.memory-action:hover {
+  background: #E0DDD8;
+}
+
+.memory-action.danger:hover {
+  background: #FFE0D8;
+  color: #E8927C;
+}
+
+.memory-edit-row {
+  display: flex;
+  gap: 4px;
+  padding: 2px 4px;
+}
+
+.memory-edit-row input {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid #E0DDD8;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.memory-edit-row input:focus {
+  border-color: #E8927C;
+}
+
+.memory-add-row {
+  display: flex;
+  gap: 6px;
+}
+
+.memory-add-row input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #E0DDD8;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.memory-add-row input:focus {
+  border-color: #E8927C;
+}
+
+.memory-btn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #E0DDD8;
+  background: #FFFFFF;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 100ms;
+  white-space: nowrap;
+}
+
+.memory-btn:hover {
+  border-color: #E8927C;
+}
+
+.memory-btn.add {
+  background: #E8927C;
+  color: #FFF;
+  border-color: #E8927C;
+}
+
+.memory-btn.add:hover {
+  background: #D8806A;
+}
+
+.memory-btn.add:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.memory-btn.save {
+  color: #7DB8A8;
+  font-weight: 600;
+}
+
+.memory-btn.cancel {
+  color: #999;
+}
+
+/* ===== System Prompt 预览 ===== */
+.system-prompt-preview {
+  background: #FAFAF8;
+  border: 1px solid #E0DDD8;
+  border-radius: 10px;
+  padding: 12px 14px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.system-prompt-preview pre {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", "Microsoft YaHei", monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #555;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+.system-prompt-empty {
+  font-size: 12px;
+  color: #BBB;
+  text-align: center;
+  padding: 20px 0;
+}
+
+/* ===== 性格标签（从聊天自动提取） ===== */
+.trait-tags-area {
+  margin-bottom: 8px;
+}
+
+.trait-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.trait-tags-list.collapsed {
+  max-height: 64px;
+  overflow: hidden;
+}
+
+.trait-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: #FFF5F2;
+  border: 1px solid #F0D0C8;
+  border-radius: 14px;
+  font-size: 12px;
+  color: #C08878;
+  transition: all 100ms;
+}
+
+.trait-tag:hover {
+  background: #FFE8E0;
+  border-color: #E8927C;
+}
+
+.trait-tag-text {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trait-tag-remove {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #D0B0A0;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  transition: all 100ms;
+}
+
+.trait-tag-remove:hover {
+  background: #E8927C;
+  color: #FFF;
+}
+
+.trait-collapse-toggle {
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 11px;
+  color: #999;
+  cursor: pointer;
+  transition: color 100ms;
+}
+
+.trait-collapse-toggle:hover {
+  color: #E8927C;
+}

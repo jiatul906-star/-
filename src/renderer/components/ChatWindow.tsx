@@ -1,21 +1,20 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { usePetStore } from '../stores/pet-store'
+import { streamChat, buildSystemPrompt } from '../plugins/chat/api'
+import type { ChatMessage, ApiProfile, MemoryEntry } from '../../common/types'
 import './chat.css'
 
-interface Message {
+// 本地显示用的消息类型（扩展 ChatMessage）
+interface DisplayMessage {
   id: string
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'system' | 'error'
   content: string
   timestamp: string
 }
 
-const INITIAL_MESSAGES: Message[] = [
-  { id: '1', role: 'assistant', content: '你好呀！今天想聊些什么呢？', timestamp: '10:32' },
-  { id: '2', role: 'user', content: '今天天气真好', timestamp: '10:33' },
-  { id: '3', role: 'assistant', content: '是呀～阳光暖暖的，心情都变好了呢 ☀️', timestamp: '10:33' },
-  { id: '4', role: 'user', content: '要不要出去走走', timestamp: '10:34' },
-  { id: '5', role: 'assistant', content: '好呀！不过你要带上我哦 ▍', timestamp: '10:34' },
+const WELCOME_MESSAGES: DisplayMessage[] = [
+  { id: 'w1', role: 'assistant', content: '你好呀！今天想聊些什么呢？', timestamp: '' },
 ]
 
 export default function ChatWindow() {
@@ -25,6 +24,7 @@ export default function ChatWindow() {
     setCharactersData,
     setActiveCharacterId,
     setCharacterImage,
+    updateCharacter,
   } = usePetStore()
 
   const activeChar = useMemo(
@@ -32,12 +32,33 @@ export default function ChatWindow() {
     [characters, activeCharacterId],
   )
 
-  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES)
+  const [messages, setMessages] = useState<DisplayMessage[]>(WELCOME_MESSAGES)
   const [inputText, setInputText] = useState('')
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
-  // 加载角色列表
+  // API Profile 状态
+  const [apiProfiles, setApiProfiles] = useState<ApiProfile[]>([])
+  const [activeProfileId, setActiveProfileId] = useState<string>('')
+  const [showApiPicker, setShowApiPicker] = useState(false)
+
+  // 记忆状态
+  const [memories, setMemories] = useState<MemoryEntry[]>([])
+
+  // 角色专属 API Profile 优先，否则使用全局激活的
+  const effectiveProfileId = useMemo(
+    () => activeChar?.apiProfileId || activeProfileId,
+    [activeChar?.apiProfileId, activeProfileId],
+  )
+  const activeProfile = useMemo(
+    () => apiProfiles.find((p) => p.id === effectiveProfileId) ?? null,
+    [apiProfiles, effectiveProfileId],
+  )
+
+  // 初始化：加载角色 + API Profiles + 聊天历史 + 记忆
   useEffect(() => {
     window.electronAPI.getCharacters().then(setCharactersData)
 
@@ -46,53 +67,217 @@ export default function ChatWindow() {
       setCharacterImage(charId, dataUrl)
     })
 
+    // 加载 API Profiles
+    window.electronAPI.getApiProfiles().then((data) => {
+      setApiProfiles(data.profiles)
+      setActiveProfileId(data.activeProfileId)
+    })
+    const unsubProfiles = window.electronAPI.onApiProfilesUpdated((data) => {
+      setApiProfiles(data.profiles)
+      setActiveProfileId(data.activeProfileId)
+    })
+
     return () => {
       unsubChars()
       unsubImage()
+      unsubProfiles()
     }
   }, [setCharactersData, setCharacterImage])
+
+  // 切换角色时加载历史 + 记忆
+  useEffect(() => {
+    if (activeChar) {
+      window.electronAPI.getChatHistory(activeChar.id).then((history) => {
+        if (history.length > 0) {
+          const displayMsgs: DisplayMessage[] = history.map((m) => ({
+            id: m.id,
+            role: m.role as DisplayMessage['role'],
+            content: m.content,
+            timestamp: formatTime(m.timestamp),
+          }))
+          setMessages(displayMsgs)
+        } else {
+          setMessages(WELCOME_MESSAGES)
+        }
+      })
+      window.electronAPI.getAgentMemory(activeChar.id).then(setMemories)
+    }
+  }, [activeChar?.id])
 
   // 自动滚动到底部
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // 发送消息
-  const sendMessage = useCallback(() => {
+  // ===== 发送消息 =====
+  const sendMessage = useCallback(async () => {
     const text = inputText.trim()
-    if (!text) return
+    if (!text || isStreaming) return
 
-    const now = new Date()
-    const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    setErrorMsg(null)
+    setInputText('')
 
-    const userMsg: Message = {
-      id: `user_${Date.now()}`,
+    const now = Date.now()
+    const time = formatTime(now)
+
+    const userMsg: DisplayMessage = {
+      id: `user_${now}`,
       role: 'user',
       content: text,
       timestamp: time,
     }
 
-    setMessages((prev) => [...prev, userMsg])
-    setInputText('')
+    // 创建 AI 占位消息
+    const aiMsgId = `ai_${now}`
+    const aiPlaceholder: DisplayMessage = {
+      id: aiMsgId,
+      role: 'assistant',
+      content: '',
+      timestamp: time,
+    }
 
-    setTimeout(() => {
-      const aiReplies = [
-        '嗯嗯～我明白你的意思',
-        '说得对呢！',
-        '哈哈，你比我想得周到',
-        '这个我还没想过呢，展开讲讲？',
-        '好有道理的样子',
-        '对对对！就是这样',
-      ]
-      const aiMsg: Message = {
-        id: `ai_${Date.now()}`,
-        role: 'assistant',
-        content: aiReplies[Math.floor(Math.random() * aiReplies.length)],
-        timestamp: time,
+    setMessages((prev) => [...prev, userMsg, aiPlaceholder])
+
+    // 保存用户消息
+    if (activeChar) {
+      const msg: ChatMessage = { id: userMsg.id, role: 'user', content: text, timestamp: now, characterId: activeChar.id }
+      window.electronAPI.addChatMessage(activeChar.id, msg).catch(() => {})
+    }
+
+    // 检测"记住 xxx"触发词
+    const rememberMatch = text.match(/^记住[：:]?\s*(.+)/)
+    if (rememberMatch && activeChar) {
+      const content = rememberMatch[1].trim()
+      const memoryEntry: MemoryEntry = {
+        id: `mem_${Date.now()}`,
+        content,
+        source: 'user-explicit',
+        createdAt: now,
+        updatedAt: now,
       }
-      setMessages((prev) => [...prev, aiMsg])
-    }, 600 + Math.random() * 800)
-  }, [inputText])
+      window.electronAPI.addAgentMemory(activeChar.id, memoryEntry).then(() => {
+        window.electronAPI.getAgentMemory(activeChar.id).then(setMemories)
+      }).catch(() => {})
+    }
+
+    // 检测设定语句，自动追加到性格描述
+    const settingPatterns = [
+      /^你是(.+)$/,
+      /^从今以后你(?:是|就是)(.+)$/,
+      /^你的设定是(.+)$/,
+      /^设定[：:]\s*(.+)$/,
+    ]
+    let extractedTrait: string | null = null
+    for (const pat of settingPatterns) {
+      const m = text.match(pat)
+      if (m) { extractedTrait = m[1].trim(); break }
+    }
+    // 过滤：排除疑问句（谁/什么/哪/干/怎么），排除过长（>30字）
+    const questionWords = /^(谁|什么|哪|干|怎么|干嘛|啥|做|是|不|有|可|会|能|要|想|可以|应该)/
+    const isValidTrait = extractedTrait
+      && extractedTrait.length >= 1
+      && extractedTrait.length <= 30
+      && !questionWords.test(extractedTrait)
+    if (isValidTrait && activeChar) {
+      const existing = (activeChar.personality || '').trim()
+      const newPersonality = existing
+        ? existing + '\n' + extractedTrait
+        : extractedTrait
+      const updated = { ...activeChar, personality: newPersonality }
+      updateCharacter(updated)
+      const allChars = characters.map((c) => (c.id === activeChar.id ? updated : c))
+      window.electronAPI.saveCharacters({ characters: allChars, activeId: activeCharacterId }).catch(() => {})
+    }
+
+    // 检查 API 配置
+    if (!activeProfile || !activeProfile.apiKey || !activeProfile.baseUrl) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === aiMsgId
+            ? { ...m, role: 'error' as const, content: '请先配置 API Key。点击 ⚙ 进入设置 > API 配置。' }
+            : m,
+        ),
+      )
+      return
+    }
+
+    // 流式调用 AI
+    setIsStreaming(true)
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    try {
+      const systemPrompt = activeChar
+        ? buildSystemPrompt(activeChar, memories)
+        : '你是一个友好的 AI 聊天伴侣。'
+
+      const apiMessages: ChatMessage[] = messages
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({
+          id: m.id,
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          timestamp: now,
+          characterId: activeChar?.id ?? '',
+        }))
+
+      apiMessages.push({
+        id: userMsg.id,
+        role: 'user',
+        content: text,
+        timestamp: now,
+        characterId: activeChar?.id ?? '',
+      })
+
+      let fullContent = ''
+      for await (const token of streamChat(apiMessages, activeProfile, systemPrompt, controller.signal)) {
+        fullContent += token
+        setMessages((prev) =>
+          prev.map((m) => (m.id === aiMsgId ? { ...m, content: fullContent } : m)),
+        )
+      }
+
+      // 保存 AI 回复
+      if (activeChar && fullContent) {
+        const aiMsg: ChatMessage = {
+          id: aiMsgId,
+          role: 'assistant',
+          content: fullContent,
+          timestamp: Date.now(),
+          characterId: activeChar.id,
+        }
+        window.electronAPI.addChatMessage(activeChar.id, aiMsg).catch(() => {})
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        // 用户取消了
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === aiMsgId && !m.content
+              ? { ...m, role: 'error' as const, content: '已取消发送' }
+              : m,
+          ),
+        )
+      } else {
+        const errText = err.message || '请求失败，请检查网络或 API 配置'
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === aiMsgId
+              ? { ...m, role: 'error' as const, content: m.content ? m.content + '\n\n[错误: ' + errText + ']' : errText }
+              : m,
+          ),
+        )
+      }
+    } finally {
+      setIsStreaming(false)
+      abortRef.current = null
+    }
+  }, [inputText, isStreaming, activeChar, activeProfile, messages, memories])
+
+  // 取消当前流式输出
+  const cancelStream = useCallback(() => {
+    abortRef.current?.abort()
+  }, [])
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -122,21 +307,16 @@ export default function ChatWindow() {
     window.electronAPI.openSettings()
   }, [])
 
+  const handleSwitchProfile = useCallback((id: string) => {
+    setActiveProfileId(id)
+    setShowApiPicker(false)
+  }, [])
+
   return (
     <div className="chat-window" style={{ pointerEvents: 'auto' }}>
-      {/* 小角色骑在边框上 */}
-      <div className="chat-pet-on-border" title="双击回到桌宠模式">
-        <div className="chat-pet-face">
-          <div className="chat-pet-eyes">
-            <div className="chat-pet-eye" />
-            <div className="chat-pet-eye" />
-          </div>
-          <div className="chat-pet-mouth" />
-        </div>
-      </div>
-
       {/* 自定义标题栏 */}
       <div className="chat-titlebar">
+        {/* 设置齿轮 */}
         {activeChar && (
           <>
             <div
@@ -144,15 +324,49 @@ export default function ChatWindow() {
               style={{ background: activeChar.gradient }}
             />
             <span className="chat-titlebar-name">{activeChar.name}</span>
+            <button
+              className="chat-titlebar-gear"
+              onClick={() => window.electronAPI.openSettings()}
+              title="设置"
+            >
+              ⚙
+            </button>
           </>
         )}
-        <button
-          className="chat-titlebar-gear"
-          onClick={() => window.electronAPI.openSettings()}
-          title="设置"
-        >
-          ⚙
-        </button>
+        {/* API 选择器 */}
+        <div className="chat-api-selector">
+          <button
+            className="chat-api-current"
+            onClick={() => setShowApiPicker(!showApiPicker)}
+            title={activeProfile ? `${activeProfile.name} / ${activeProfile.model}${activeChar?.apiProfileId ? ' (角色专属)' : ''}` : '未配置 API'}
+          >
+            {activeProfile ? activeProfile.name : '未配置'}
+            {activeChar?.apiProfileId && <span className="api-char-badge" title="角色专属 API">👤</span>}
+          </button>
+          {showApiPicker && (
+            <div className="chat-api-dropdown">
+              {apiProfiles.map((p) => (
+                <button
+                  key={p.id}
+                  className={`chat-api-option${p.id === effectiveProfileId ? ' active' : ''}`}
+                  onClick={() => handleSwitchProfile(p.id)}
+                >
+                  <span className="api-opt-name">{p.name}</span>
+                  <span className="api-opt-model">{p.model}</span>
+                </button>
+              ))}
+              <div className="chat-api-divider" />
+              <button
+                className="chat-api-option settings-link"
+                onClick={() => { window.electronAPI.openSettings(); setShowApiPicker(false); }}
+              >
+                ⚙ 管理 API 配置
+              </button>
+            </div>
+          )}
+        </div>
+        {/* 关闭选择器点击外部 */}
+        {showApiPicker && <div className="chat-api-backdrop" onClick={() => setShowApiPicker(false)} />}
         <div className="chat-titlebar-actions">
           <button className="chat-titlebar-btn" onClick={() => window.electronAPI.minimize()} title="最小化">─</button>
           <button className="chat-titlebar-btn" onClick={() => window.electronAPI.maximize()} title="最大化">□</button>
@@ -180,15 +394,31 @@ export default function ChatWindow() {
 
         {/* 消息区域 */}
         <div className="chat-area">
+          {/* 错误提示条 */}
+          {errorMsg && (
+            <div className="chat-error-bar">
+              <span>{errorMsg}</span>
+              <button onClick={() => setErrorMsg(null)}>✕</button>
+            </div>
+          )}
+
           <div className="chat-messages">
             {messages.map((msg) => (
               <div key={msg.id} className={`chat-msg ${msg.role}`}>
                 {msg.role === 'assistant' && activeChar && (
                   <div className="chat-msg-avatar" style={{ background: activeChar.gradient }} />
                 )}
+                {msg.role === 'error' && (
+                  <div className="chat-msg-avatar chat-msg-avatar-error">!</div>
+                )}
                 <div>
-                  <div className="chat-msg-bubble">{msg.content}</div>
-                  <div className="chat-msg-time">{msg.timestamp}</div>
+                  <div className={`chat-msg-bubble${msg.role === 'error' ? ' error' : ''}`}>
+                    {msg.content || (msg.role === 'assistant' && isStreaming ? <span className="chat-cursor">▍</span> : '')}
+                    {msg.role === 'assistant' && isStreaming && messages[messages.length - 1]?.id === msg.id && (
+                      <span className="chat-cursor">▍</span>
+                    )}
+                  </div>
+                  {msg.timestamp && <div className="chat-msg-time">{msg.timestamp}</div>}
                 </div>
               </div>
             ))}
@@ -201,24 +431,40 @@ export default function ChatWindow() {
               ref={textareaRef}
               className="chat-input"
               rows={1}
-              placeholder="输入消息..."
+              placeholder={isStreaming ? 'AI 回复中...' : '输入消息...'}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={onKeyDown}
               onInput={onInput}
+              disabled={isStreaming}
             />
-            <motion.button
-              className="chat-btn-send"
-              onClick={sendMessage}
-              disabled={!inputText.trim()}
-              whileTap={{ scale: 0.9 }}
-              whileHover={{ scale: 1.08 }}
-            >
-              ↑
-            </motion.button>
+            {isStreaming ? (
+              <motion.button
+                className="chat-btn-stop"
+                onClick={cancelStream}
+                whileTap={{ scale: 0.9 }}
+              >
+                ■
+              </motion.button>
+            ) : (
+              <motion.button
+                className="chat-btn-send"
+                onClick={sendMessage}
+                disabled={!inputText.trim()}
+                whileTap={{ scale: 0.9 }}
+                whileHover={{ scale: 1.08 }}
+              >
+                ↑
+              </motion.button>
+            )}
           </div>
         </div>
       </div>
     </div>
   )
+}
+
+function formatTime(ts: number): string {
+  const d = new Date(ts)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }

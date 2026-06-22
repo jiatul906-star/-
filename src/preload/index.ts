@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { PetAction, CharactersData } from '../common/types'
+import type { PetAction, CharactersData, ApiProfilesData, ApiProfile, ChatMessage, MemoryEntry } from '../common/types'
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // 窗口控制
@@ -54,4 +54,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('pet:menuClose', listener)
     return () => ipcRenderer.removeListener('pet:menuClose', listener)
   },
+
+  // ===== API Profiles =====
+  getApiProfiles: (): Promise<ApiProfilesData> => ipcRenderer.invoke('api-profiles:getAll'),
+  saveApiProfiles: (data: ApiProfilesData): Promise<void> => ipcRenderer.invoke('api-profiles:saveAll', data),
+  testApiConnection: (profile: ApiProfile): Promise<{ ok: boolean; status: number; error?: string }> =>
+    ipcRenderer.invoke('api-profiles:test', profile),
+  onApiProfilesUpdated: (callback: (data: ApiProfilesData) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: ApiProfilesData) => callback(data)
+    ipcRenderer.on('api-profiles:updated', listener)
+    return () => ipcRenderer.removeListener('api-profiles:updated', listener)
+  },
+
+  // ===== Chat History =====
+  getChatHistory: (characterId: string): Promise<ChatMessage[]> =>
+    ipcRenderer.invoke('chat-history:get', characterId),
+  addChatMessage: (characterId: string, message: ChatMessage): Promise<void> =>
+    ipcRenderer.invoke('chat-history:add', characterId, message),
+  clearChatHistory: (characterId: string): Promise<void> =>
+    ipcRenderer.invoke('chat-history:clear', characterId),
+
+  // ===== Agent Memory =====
+  getAgentMemory: (characterId: string): Promise<MemoryEntry[]> =>
+    ipcRenderer.invoke('agent-memory:getAll', characterId),
+  addAgentMemory: (characterId: string, entry: MemoryEntry): Promise<void> =>
+    ipcRenderer.invoke('agent-memory:add', characterId, entry),
+  deleteAgentMemory: (characterId: string, id: string): Promise<void> =>
+    ipcRenderer.invoke('agent-memory:delete', characterId, id),
+  updateAgentMemory: (characterId: string, id: string, content: string): Promise<void> =>
+    ipcRenderer.invoke('agent-memory:update', characterId, id, content),
 })

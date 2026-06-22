@@ -86,3 +86,82 @@
 .ctx-chat-send:hover {
   background: #d87a6a;
 }
+
+/* ===== 聊天消息气泡区 ===== */
+.ctx-chat-bubbles {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 52px;
+  max-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 200;
+  pointer-events: auto;
+  WebkitAppRegion: no-drag;
+}
+
+.ctx-bubble {
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  max-width: 85%;
+  word-break: break-word;
+  transition: opacity 1.2s ease-out;
+}
+
+.ctx-bubble.user {
+  align-self: flex-end;
+  background: #E8927C;
+  color: #FFF;
+}
+
+.ctx-bubble.assistant {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  color: #3C3C3C;
+}
+
+.ctx-bubble-role {
+  font-size: 9px;
+  font-weight: 600;
+  margin-bottom: 1px;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.ctx-bubble.user .ctx-bubble-role {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.ctx-bubble.assistant .ctx-bubble-role {
+  color: #999;
+}
+
+.ctx-bubble-text {
+  white-space: pre-wrap;
+}
+
+.ctx-bubble-typing {
+  animation: ctxTypingPulse 0.6s ease-in-out infinite;
+}
+
+@keyframes ctxTypingPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+/* 滚动条美化 */
+.ctx-chat-bubbles::-webkit-scrollbar {
+  width: 3px;
+}
+
+.ctx-chat-bubbles::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
