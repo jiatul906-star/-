@@ -3,6 +3,7 @@ import { join } from 'path'
 
 export function createChatWindow(): BrowserWindow {
   const win = new BrowserWindow({
+    title: 'AI 伴侣',
     width: 960,
     height: 680,
     minWidth: 680,

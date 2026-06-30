@@ -12,7 +12,6 @@ export function createPetWindow(): BrowserWindow {
     x: Math.round((sw - winW) / 2),
     y: Math.round((sh - winH) / 3),
     transparent: true,
-    backgroundColor: '#FF0000',
     frame: false,
     alwaysOnTop: true,
     resizable: false,

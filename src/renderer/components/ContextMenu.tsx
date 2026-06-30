@@ -14,6 +14,7 @@ interface Props {
   cy: number
   onAction: (action: PetAction) => void
   onClose: () => void
+  onBackToActions?: () => void
   onSendChat?: (text: string) => void
   chatMessages?: ChatBubbleMessage[]
   isChatStreaming?: boolean
@@ -30,6 +31,7 @@ export default function ContextMenu({
   cy,
   onAction,
   onClose,
+  onBackToActions,
   onSendChat,
   chatMessages = [],
   isChatStreaming = false,
@@ -153,47 +155,52 @@ export default function ContextMenu({
               })}
           </AnimatePresence>
 
-          {/* 聊天消息气泡区 — 历史消息淡化 */}
-          <AnimatePresence>
-            {chatMessages.length > 0 && (
-              <motion.div
-                className="ctx-chat-bubbles"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 6 }}
-                transition={{ duration: 0.2 }}
-                key="bubbles"
-                style={{
-                  bottom: hasMessages ? 48 : 52,
-                  maxHeight: hasMessages ? 100 : 120,
-                }}
-              >
-                {chatMessages.map((msg, i) => {
-                  const isPinned = pinnedIndices.has(i)
-                  const age = chatMessages.length - 1 - i // 0 = newest
-                  // 最近2条不淡化，更早的按年龄降低透明度直至消失
-                  const opacity = isPinned ? 1 : Math.max(0, 1 - age * 0.3)
-                  return (
-                    <div
-                      key={i}
-                      className={`ctx-bubble ${msg.role}${!isPinned ? ' fading' : ''}`}
-                      style={{ opacity }}
-                    >
-                      <div className="ctx-bubble-role">{msg.role === 'user' ? '你' : charName}</div>
-                      <div className="ctx-bubble-text">
-                        {msg.content || (msg.role === 'assistant' && isChatStreaming && i === chatMessages.length - 1
-                          ? <span className="ctx-bubble-typing">...</span>
-                          : msg.content
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-                {/* 自动滚动锚点 */}
-                <div ref={(el) => { if (el) el.scrollIntoView({ behavior: 'smooth' }) }} />
-              </motion.div>
-            )}
-          </AnimatePresence>
+         {/* 聊天消息气泡区 — 历史消息淡化 */}
+         <AnimatePresence>
+           {chatMessages.length > 0 && (
+             <motion.div
+               className="ctx-chat-bubbles"
+               initial={{ opacity: 0, y: 6 }}
+               animate={{ opacity: 1, y: 0 }}
+               exit={{ opacity: 0, y: 6 }}
+               transition={{ duration: 0.2 }}
+               key="bubbles"
+               style={{
+                 bottom: hasMessages ? 48 : 52,
+                 maxHeight: hasMessages ? 100 : 120,
+               }}
+            >
+             <button className="ctx-chat-back" onClick={() => onBackToActions?.()}>← 返回</button>
+              {chatMessages.map((msg, i) => {
+                const isPinned = pinnedIndices.has(i)
+                const age = chatMessages.length - 1 - i // 0 = newest
+                 // 最近2条不淡化，更早的按年龄降低透明度直至消失
+                 const opacity = isPinned ? 1 : Math.max(0, 1 - age * 0.3)
+                 return (
+                   <motion.div
+                     key={i}
+                     className={`ctx-bubble ${msg.role}${!isPinned ? ' fading' : ''}`}
+                     style={{ opacity }}
+                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                     animate={{ opacity, y: 0, scale: 1 }}
+                     transition={{ duration: 0.3, ease: 'easeOut' }}
+                     layout
+                   >
+                     <div className="ctx-bubble-role">{msg.role === 'user' ? '你' : charName}</div>
+                     <div className="ctx-bubble-text">
+                       {msg.content || (msg.role === 'assistant' && isChatStreaming && i === chatMessages.length - 1
+                         ? <span className="ctx-bubble-typing">...</span>
+                         : msg.content
+                       )}
+                     </div>
+                   </motion.div>
+                 )
+               })}
+               {/* 自动滚动锚点 */}
+               <div ref={(el) => { if (el) el.scrollIntoView({ behavior: 'smooth' }) }} />
+             </motion.div>
+           )}
+         </AnimatePresence>
 
           {/* 聊天输入框 — 从下浮入 */}
           <motion.div

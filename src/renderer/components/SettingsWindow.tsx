@@ -4,6 +4,7 @@ import { DEFAULT_PET_ACTIONS } from '../../common/types'
 import { usePetStore } from '../stores/pet-store'
 import { buildSystemPrompt } from '../plugins/chat/api'
 import ActionEditor from './ActionEditor'
+import ImageCropper from './ImageCropper'
 import './settings.css'
 
 type NavKey = 'appearance' | 'actions' | 'about' | 'api'
@@ -49,10 +50,16 @@ export default function SettingsWindow() {
   const [actions, setActions] = useState<PetAction[]>([])
   const [saved, setSaved] = useState(false)
   const [name, setName] = useState('')
+  const [cropImageUrl, setCropImageUrl] = useState<string | null>(null)
   const [petImagePreview, setPetImagePreview] = useState<string | null>(null)
   const [personality, setPersonality] = useState('')
   const [speechStyle, setSpeechStyle] = useState('')
   const [charApiProfileId, setCharApiProfileId] = useState('')
+
+  // ===== 主题状态 =====
+  const [themeMode, setThemeMode] = useState<'light' | 'dark'>(
+    () => (localStorage.getItem('theme-mode') as 'light' | 'dark') || 'light'
+  )
 
   // ===== API Profile 状态 =====
   const [apiProfiles, setApiProfiles] = useState<ApiProfile[]>([])
@@ -199,14 +206,33 @@ export default function SettingsWindow() {
     if (!activeChar) return
     const dataUrl = await window.electronAPI.openImageDialog(activeChar.id)
     if (dataUrl) {
-      setCharacterImage(activeChar.id, dataUrl)
-      setPetImagePreview(dataUrl)
-      const updated = { ...activeChar, imageDataUrl: dataUrl }
-      updateCharacter(updated)
-      const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
-      persist(all, activeCharacterId)
+      setCropImageUrl(dataUrl)
     }
+  }, [activeChar])
+
+  const handleCropConfirm = useCallback((croppedDataUrl: string) => {
+    if (!activeChar) return
+    setCropImageUrl(null)
+    setCharacterImage(activeChar.id, croppedDataUrl)
+    setPetImagePreview(croppedDataUrl)
+    const updated = { ...activeChar, imageDataUrl: croppedDataUrl }
+    updateCharacter(updated)
+    const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
+    persist(all, activeCharacterId)
   }, [activeChar, characters, activeCharacterId, updateCharacter, setCharacterImage, persist])
+
+  const handleCropCancel = useCallback(() => {
+    setCropImageUrl(null)
+  }, [])
+
+  const toggleTheme = useCallback(() => {
+    setThemeMode((prev) => {
+      const next = prev === "light" ? "dark" : "light"
+      localStorage.setItem("theme-mode", next)
+      document.documentElement.setAttribute("data-theme", next)
+      return next
+    })
+  }, [])
 
   const handleClearImage = useCallback(() => {
     if (!activeChar) return
@@ -432,6 +458,13 @@ export default function SettingsWindow() {
 
         {/* 右侧内容 */}
         <div className="settings-content">
+          {cropImageUrl && (
+            <ImageCropper
+              imageUrl={cropImageUrl}
+              onCrop={handleCropConfirm}
+              onCancel={handleCropCancel}
+            />
+          )}
           {nav === 'appearance' && activeChar && (
             <>
               <h3>编辑角色 · {activeChar.name}</h3>
@@ -632,6 +665,20 @@ export default function SettingsWindow() {
                 </div>
               )}
 
+              <div className="theme-toggle-section">
+                <label className="theme-toggle-label">
+                  <span>🌓 主题模式（界面外观）</span>
+                  <button
+                    className={`theme-toggle-btn${themeMode === "dark" ? " dark" : ""}`}
+                    onClick={toggleTheme}
+                    title={themeMode === "dark" ? "切换到浅色模式" : "切换到深色模式"}
+                  >
+                    <span className="theme-toggle-thumb" />
+                  </button>
+                  <span className="theme-mode-text">{themeMode === "dark" ? "深色模式" : "浅色模式"}</span>
+                </label>
+              </div>
+
             </>
           )}
 
@@ -755,6 +802,19 @@ export default function SettingsWindow() {
               <p><strong>版本：</strong>0.1.0</p>
               <p><strong>技术栈：</strong>Electron + React + TypeScript</p>
               <p><strong>功能：</strong>桌宠互动 · AI 聊天 · 角色自定义</p>
+              <div className="theme-toggle-section">
+                <label className="theme-toggle-label">
+                  <span>🌓 主题模式</span>
+                  <button
+                    className={`theme-toggle-btn${themeMode === "dark" ? " dark" : ""}`}
+                    onClick={toggleTheme}
+                    title={themeMode === "dark" ? "切换到浅色模式" : "切换到深色模式"}
+                  >
+                    <span className="theme-toggle-thumb" />
+                  </button>
+                  <span className="theme-mode-text">{themeMode === "dark" ? "深色模式" : "浅色模式"}</span>
+                </label>
+              </div>
             </div>
           )}
         </div>

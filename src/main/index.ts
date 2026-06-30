@@ -40,8 +40,9 @@ function savePetActions(actions: PetAction[]): void {
 }
 
 function createTray(): Tray {
+  // 32x32 magenta chat-bubble icon — visible on both light & dark taskbars
   const icon = nativeImage.createFromDataURL(
-    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAMlJREFUWEftlrENwjAURc9fEjQskIGyAhuwAhMwAiMwAhswAhswAhswAhswAhswAhswAhswAhvEURLZii0niZKf4sRJ3r3v69+xLcYY/JND/qnchEAdgToCdQTqCNQREBFYr9dYrVZgZrx3gNZaiAjfQURgPp+LzWaDqqqwWCzQNA2YWWQcx6+wLQBmBkSotMIwBN57OOfgz4kxRpCMhFEBEDnn4JxD0zRgZnjv96+iWq0gHR0dQETYD/K+FOb3vgvG0yP8BmsHIkQQEX9u+QIxkC4CYp+W3wAAAABJRU5ErkJggg=='
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAfklEQVR4nO3UQQqAIBCFYY/W/U/hPVzkSohkdN7zjQQ2tBL8P9IopX/Uk68SErWewLSAcdZJA6rDBlHHjFiArnuNfs/dZrByDrB4ATsM5oj2AYOjFwCvS+YB60OarnzmV0EbQJ0w4DpkkHUPs5r2vITAsBhN2jLE9ScTlT51KhSSYHD1ZTx3AAAAAElFTkSuQmCC'
   )
 
   const trayInstance = new Tray(icon)
@@ -87,6 +88,7 @@ function getOrCreateSettingsWindow(): BrowserWindow {
 
 function bootstrap() {
   chatWindow = createChatWindow()
+  chatWindow.on('closed', () => { chatWindow = null })
   petWindow = createPetWindow()
   tray = createTray()
 
@@ -95,6 +97,15 @@ function bootstrap() {
     savePetActions,
     getPetWindow: () => petWindow,
     getChatWindow: () => chatWindow,
+    getOrCreateChatWindow: () => {
+      if (chatWindow && !chatWindow.isDestroyed()) {
+        chatWindow.focus()
+        return chatWindow
+      }
+      chatWindow = createChatWindow()
+      chatWindow.on('closed', () => { chatWindow = null })
+      return chatWindow
+    },
     getOrCreateSettingsWindow,
     getAllWindows: () => [chatWindow, petWindow, settingsWindow].filter(Boolean) as BrowserWindow[],
   })

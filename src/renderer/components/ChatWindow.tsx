@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+﻿import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { usePetStore } from '../stores/pet-store'
 import { streamChat, buildSystemPrompt } from '../plugins/chat/api'
@@ -38,12 +38,14 @@ export default function ChatWindow() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const abortRef = useRef<AbortController | null>(null)
+ const abortRef = useRef<AbortController | null>(null)
+  const lastUserTextRef = useRef('')
 
   // API Profile 状态
   const [apiProfiles, setApiProfiles] = useState<ApiProfile[]>([])
   const [activeProfileId, setActiveProfileId] = useState<string>('')
   const [showApiPicker, setShowApiPicker] = useState(false)
+  const [isDark, setIsDark] = useState(() => (localStorage.getItem("theme-mode") || "light") === "dark")
 
   // 记忆状态
   const [memories, setMemories] = useState<MemoryEntry[]>([])
@@ -77,10 +79,30 @@ export default function ChatWindow() {
       setActiveProfileId(data.activeProfileId)
     })
 
+    const unsubHistory = window.electronAPI.onChatHistoryUpdated((payload) => {
+      // read latest active character from store to avoid stale closure
+      const store = usePetStore.getState()
+      const currentChar = store.characters.find((c) => c.id === store.activeCharacterId) ?? null
+      if (payload.characterId === currentChar?.id && currentChar) {
+        window.electronAPI.getChatHistory(currentChar.id).then((history) => {
+          if (history.length > 0) {
+            const displayMsgs = history.map((m) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              timestamp: formatTime(m.timestamp),
+            }))
+            setMessages(displayMsgs)
+          }
+        })
+      }
+    })
+
     return () => {
       unsubChars()
       unsubImage()
       unsubProfiles()
+      unsubHistory()
     }
   }, [setCharactersData, setCharacterImage])
 
@@ -110,12 +132,15 @@ export default function ChatWindow() {
   }, [messages])
 
   // ===== 发送消息 =====
-  const sendMessage = useCallback(async () => {
-    const text = inputText.trim()
+  const sendMessage = useCallback(async (overrideText?: string) => {
+    const text = (overrideText ?? inputText).trim()
     if (!text || isStreaming) return
 
     setErrorMsg(null)
-    setInputText('')
+    if (overrideText === undefined) {
+      setInputText('')
+    }
+    lastUserTextRef.current = text
 
     const now = Date.now()
     const time = formatTime(now)
@@ -204,6 +229,11 @@ export default function ChatWindow() {
     // 流式调用 AI
     setIsStreaming(true)
     const controller = new AbortController()
+    let timedOut = false
+    const timeoutId = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, 30000)
     abortRef.current = controller
 
     try {
@@ -249,17 +279,22 @@ export default function ChatWindow() {
         window.electronAPI.addChatMessage(activeChar.id, aiMsg).catch(() => {})
       }
     } catch (err: any) {
-      if (err.name === 'AbortError') {
-        // 用户取消了
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === aiMsgId && !m.content
-              ? { ...m, role: 'error' as const, content: '已取消发送' }
-              : m,
-          ),
-        )
+     if (err.name === 'AbortError') {
+        if (timedOut) {
+          setErrorMsg('请求超时，请检查网络连接')
+        } else {
+          // 用户取消了
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === aiMsgId && !m.content
+                ? { ...m, role: 'error' as const, content: '已取消发送' }
+                : m,
+            ),
+          )
+        }
       } else {
         const errText = err.message || '请求失败，请检查网络或 API 配置'
+        setErrorMsg(errText)
         setMessages((prev) =>
           prev.map((m) =>
             m.id === aiMsgId
@@ -269,15 +304,23 @@ export default function ChatWindow() {
         )
       }
     } finally {
+      clearTimeout(timeoutId)
       setIsStreaming(false)
       abortRef.current = null
     }
-  }, [inputText, isStreaming, activeChar, activeProfile, messages, memories])
+  }, [inputText, isStreaming, activeChar, activeProfile, messages, memories, errorMsg])
 
   // 取消当前流式输出
-  const cancelStream = useCallback(() => {
-    abortRef.current?.abort()
-  }, [])
+ const cancelStream = useCallback(() => {
+   abortRef.current?.abort()
+ }, [])
+
+  const handleRetry = useCallback(() => {
+    const text = lastUserTextRef.current
+    if (text) {
+      sendMessage(text)
+    }
+  }, [sendMessage])
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -312,6 +355,16 @@ export default function ChatWindow() {
     setShowApiPicker(false)
   }, [])
 
+  const toggleTheme = useCallback(() => {
+    setIsDark((prev) => {
+      const next = !prev
+      const mode = next ? "dark" : "light"
+      localStorage.setItem("theme-mode", mode)
+      document.documentElement.setAttribute("data-theme", mode)
+      return next
+    })
+  }, [])
+
   return (
     <div className="chat-window" style={{ pointerEvents: 'auto' }}>
       {/* 自定义标题栏 */}
@@ -330,6 +383,13 @@ export default function ChatWindow() {
               title="设置"
             >
               ⚙
+            </button>
+            <button
+              className="chat-titlebar-theme"
+              onClick={toggleTheme}
+              title={isDark ? "切换到浅色模式" : "切换到深色模式"}
+            >
+              {isDark ? "☀️" : "🌙"}
             </button>
           </>
         )}
@@ -398,6 +458,7 @@ export default function ChatWindow() {
           {errorMsg && (
             <div className="chat-error-bar">
               <span>{errorMsg}</span>
+              <button className="chat-error-retry" onClick={handleRetry}>↻ 重试</button>
               <button onClick={() => setErrorMsg(null)}>✕</button>
             </div>
           )}

@@ -17,12 +17,13 @@ interface IpcDeps {
   savePetActions: (actions: PetAction[]) => void
   getPetWindow: () => BrowserWindow | null
   getChatWindow: () => BrowserWindow | null
+  getOrCreateChatWindow: () => BrowserWindow
   getOrCreateSettingsWindow: () => BrowserWindow
   getAllWindows: () => BrowserWindow[]
 }
 
 export function registerIpc(deps: IpcDeps) {
-  const { loadPetActions, savePetActions, getPetWindow, getChatWindow, getOrCreateSettingsWindow, getAllWindows } = deps
+  const { loadPetActions, savePetActions, getPetWindow, getChatWindow, getOrCreateChatWindow, getOrCreateSettingsWindow, getAllWindows } = deps
 
   // ===== window controls =====
   ipcMain.handle('window:minimize', (event) => {
@@ -63,17 +64,18 @@ export function registerIpc(deps: IpcDeps) {
     return loadPetActions()
   })
 
-  ipcMain.handle('pet-actions:save', (_event, actions: PetAction[]) => {
-    savePetActions(actions)
+ ipcMain.handle('pet-actions:save', (_event, actions: PetAction[]) => {
+   savePetActions(actions)
+    for (const win of getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send('pet-actions:updated', actions)
+      }
+    }
   })
 
   // ===== open windows =====
   ipcMain.handle('window:openChat', () => {
-    const win = getChatWindow()
-    if (win) {
-      win.show()
-      win.focus()
-    }
+    getOrCreateChatWindow()
   })
 
   ipcMain.handle('window:openSettings', () => {
@@ -360,6 +362,12 @@ export function registerIpc(deps: IpcDeps) {
     }
     all[characterId] = list
     saveChatHistory(all)
+    // broadcast to all windows
+    for (const win of getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send('chat-history:updated', { characterId, message })
+      }
+    }
   })
 
   ipcMain.handle('chat-history:clear', (_event, characterId: string) => {
@@ -368,7 +376,7 @@ export function registerIpc(deps: IpcDeps) {
     saveChatHistory(all)
   })
 
-  // ===== Agent memory persistence =====
+ // ===== Agent memory persistence =====
   const agentMemoryFile = join(app.getPath('userData'), 'agent-memory.json')
 
   function loadAgentMemory(): Record<string, MemoryEntry[]> {
@@ -407,16 +415,88 @@ export function registerIpc(deps: IpcDeps) {
     }
   })
 
-  ipcMain.handle('agent-memory:update', (_event, characterId: string, id: string, content: string) => {
+ ipcMain.handle('agent-memory:update', (_event, characterId: string, id: string, content: string) => {
+   const all = loadAgentMemory()
+   const list = all[characterId]
+   if (list) {
+     const entry = list.find((e) => e.id === id)
+     if (entry) {
+       entry.content = content
+       entry.updatedAt = Date.now()
+       saveAgentMemory(all)
+     }
+   }
+ })
+
+  // ===== Agent Memory Import / Export =====
+  ipcMain.handle('agent-memory:export', async (_event, characterId: string, charName: string) => {
     const all = loadAgentMemory()
-    const list = all[characterId]
-    if (list) {
-      const entry = list.find((e) => e.id === id)
-      if (entry) {
-        entry.content = content
-        entry.updatedAt = Date.now()
-        saveAgentMemory(all)
+    const memories = all[characterId] ?? []
+
+    const now = new Date()
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    const safeName = charName.replace(/[<>:"/\\|?*]/g, '_')
+
+    const result = await dialog.showSaveDialog({
+      defaultPath: `agent-memory-${safeName}-${dateStr}.json`,
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    })
+
+    if (result.canceled || !result.filePath) return { success: false }
+
+    try {
+      writeFileSync(result.filePath, JSON.stringify(memories, null, 2), 'utf-8')
+      return { success: true }
+    } catch (e: any) {
+      return { success: false, error: e.message || '写入文件失败' }
+    }
+  })
+
+  ipcMain.handle('agent-memory:import', async (_event, characterId: string) => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    })
+
+    if (result.canceled || result.filePaths.length === 0) return { success: false, reason: 'canceled' }
+
+    try {
+      const raw = readFileSync(result.filePaths[0], 'utf-8')
+      const data = JSON.parse(raw)
+
+      if (!Array.isArray(data)) {
+        return { success: false, reason: 'invalid_format', error: 'JSON 文件格式错误：需要数组' }
       }
+
+      const validEntries: MemoryEntry[] = []
+      let ts = Date.now()
+      for (const item of data) {
+        if (item && typeof item.content === 'string') {
+          const source: 'ai-extracted' | 'user-explicit' =
+            item.source === 'ai-extracted' ? 'ai-extracted' : 'user-explicit'
+          validEntries.push({
+            id: item.id || `import_${ts}_${Math.random().toString(36).slice(2, 7)}`,
+            content: item.content,
+            source,
+            createdAt: item.createdAt || ts,
+            updatedAt: item.updatedAt || ts,
+          })
+          ts++
+        }
+      }
+
+      if (validEntries.length === 0) {
+        return { success: false, reason: 'no_valid', error: '未找到有效的记忆条目。每条必须包含 "content" 字段。' }
+      }
+
+      const all = loadAgentMemory()
+      const existing = all[characterId] ?? []
+      all[characterId] = [...existing, ...validEntries]
+      saveAgentMemory(all)
+
+      return { success: true, entries: validEntries }
+    } catch (e: any) {
+      return { success: false, reason: 'parse_error', error: '文件解析失败: ' + (e.message || '未知错误') }
     }
   })
 }

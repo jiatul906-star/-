@@ -64,7 +64,7 @@
 
 | 窗口 | 技术 | 生命周期 |
 |------|------|---------|
-| **主窗口** | BrowserWindow（frameless, 420×600 默认, 320×360 最小, 可拖拽调大小） | 应用启动到退出 |
+| **主窗口** | BrowserWindow（frameless, 960×680 默认, 680×480 最小, 可拖拽调大小） | 应用启动到退出 |
 | **桌宠窗口** | BrowserWindow（transparent, alwaysOnTop, frame: false, 尺寸跟随素材） | 首次选择角色后创建，退出时销毁 |
 | **设置弹窗** | 主窗口内 CSS overlay | 打开到关闭，非独立 BrowserWindow |
 
@@ -93,98 +93,80 @@
 
 ## 四、模块拆分
 
+> ⚠️ **初稿已过时。** 以下为计划中的目录结构。**实际代码结构以 `ag.md` 和 `src/` 为准。** 关键差异：
+> - `src/core/` → 实际为 `src/renderer/core/`
+> - `src/shared/` → 实际为 `src/common/`
+> - `main/window-manager.ts` → 实际未拆分，逻辑在 `main/index.ts` + `main/ipc/index.ts` + `main/windows/*.ts`
+> - 插件系统实际使用有限，功能代码主要在 `renderer/components/` 和 `renderer/stores/`
+
 ```
 src/
 ├── main/                    # Electron 主进程
 │   ├── index.ts             # 入口：创建窗口、注册 IPC
-│   ├── window-manager.ts    # 窗口创建/销毁/位置同步
-│   ├── ipc-bridge.ts        # IPC 通道注册与路由
-│   └── tts-service.ts       # Python 子进程管理 + HTTP 通信
+│   ├── ipc/index.ts         # IPC 通道注册与路由（含持久化逻辑）
+│   └── windows/             # chat.ts / pet.ts / settings.ts
 │
-├── core/                    # 壳（渲染进程）
-│   ├── event-bus.ts         # 插件间事件总线
-│   ├── theme.ts             # 主题引擎（setTheme/setMode/setDensity/getCurrent + localStorage）
-│   ├── data-store.ts        # 数据层（角色/设置/聊天记录 CRUD + 持久化）
-│   └── ipc-client.ts        # 渲染进程 ↔ 主进程 IPC 封装
+├── renderer/                # 渲染进程
+│   ├── App.tsx              # 根组件（hash 路由）
+│   ├── main.tsx             # React 入口
+│   ├── core/                # event-bus.ts / plugin.ts
+│   ├── plugins/             # chat(✅) / diy(空壳) / pet(空壳) / tts(空壳)
+│   ├── stores/pet-store.ts  # Zustand 全局状态
+│   └── components/          # ChatWindow / PetWindow / SettingsWindow / ContextMenu 等
 │
-├── plugins/                 # 插件（每个插件 export 一个对象）
-│   ├── chat/                # 聊天插件
-│   │   ├── index.ts         #   导出 ChatPlugin
-│   │   ├── components/      #   气泡/消息列表/输入框/流式光标
-│   │   └── api.ts           #   AI API 调用（OpenAI 兼容接口）
-│   ├── pet/                 # 桌宠插件
-│   │   ├── index.ts         #   导出 PetPlugin
-│   │   ├── components/      #   帧动画/SpeechBubble/交互菜单
-│   │   └── state-machine.ts #   动画状态机
-│   ├── diy/                 # DIY 角色编辑插件
-│   │   ├── index.ts
-│   │   └── components/      #   外观/性格/声音三个标签页
-│   ├── settings/            # 设置插件
-│   │   ├── index.ts
-│   │   └── components/      #   AI 设置 / 界面外观
-│   └── tts/                 # TTS 控制插件
-│       ├── index.ts
-│       └── audio-player.ts  #   流式播放 + 打断策略
-│
-└── shared/                  # 公共
-    ├── types.ts             # 类型定义（角色/AI配置/主题配置/消息）
-    ├── ipc-channels.ts      # IPC 通道名常量
-    └── constants.ts         # 默认值/预设角色/默认主题
+├── preload/                 # contextBridge → window.electronAPI
+└── common/types.ts          # 公共类型定义
 ```
 
 ### 模块职责边界
 
+> ⚠️ 以下为设计意图，实际实现可能不同。以 `src/` 中代码为准。
+
 | 模块 | 拥有 | 不拥有 |
 |------|------|--------|
-| core/event-bus | 插件间消息路由 | 不处理业务逻辑 |
-| core/theme | CSS 变量写入 + localStorage | 不管理 UI 组件 |
-| core/data-store | 角色/设置/聊天记录 CRUD | 不直接操作 DOM |
-| plugins/chat | 消息收发、气泡渲染 | 不管桌宠动画、不管设置 |
-| plugins/pet | 帧动画、交互、状态机 | 不管聊天内容、不管 API |
-| plugins/diy | 角色编辑表单 | 不管聊天、不管桌宠行为 |
-| plugins/tts | TTS 触发与播放控制 | 不管文本来源、不管角色切换 |
+| renderer/core/event-bus | 插件间消息路由 | 不处理业务逻辑 |
+| renderer/stores/pet-store | Zustand 全局状态（角色、动作、API配置） | 不直接操作 DOM |
+| main/ipc/index.ts | IPC 通道注册 + JSON 文件持久化 | 不处理渲染逻辑 |
+| renderer/plugins/chat | 消息收发、AI API 调用 | 不管桌宠动画、不管设置 |
+| renderer/components/ChatWindow | 聊天 UI 渲染 | 不管 API 调用细节 |
+| renderer/components/SettingsWindow | 设置 UI（角色编辑/API配置/外观） | 不管聊天、不管桌宠行为 |
+| renderer/components/PetWindow | 桌宠渲染 + 右键菜单交互 | 不管聊天历史、不管 AI 调用 |
 
 ---
 
 ## 五、数据流
 
-### 5.1 发送一条消息的完整路径
+> ⚠️ **实际数据流**：以 `bug/开发速查手册.md` 第五节"AI 调用流程"和第六节"状态管理模式"为准。下方为设计原稿，保留供参考。
+
+### 5.1 发送一条消息的完整路径（实际）
 
 ```
 用户输入 "你好"
-  → InputBar (plugins/chat)
-  → ChatPlugin.sendMessage("你好")
-  → api.ts: fetch(API_URL, { messages: [...history, "你好"] })
-  → 流式响应 → 逐字写入 MessageList
-  → 如果 TTS 开启：
-      ChatPlugin → event-bus.emit('tts:play', { text, characterId })
-      → TTSPlugin → ipc-client → 主进程 → Python HTTP → IndexTTS
-      → mp3 buffer → IPC → renderer → HTML5 Audio 播放
-      → 同时 event-bus.emit('pet:animate', { state: 'talk' })
+  → ChatWindow 输入框
+  → sendMessage() (ChatWindow.tsx)
+  → buildSystemPrompt(activeChar, memories) (chat/api.ts)
+  → streamChat(messages, profile, systemPrompt) (chat/api.ts)
+  → SSE 流式响应 → 逐字写入消息列表
+  → 完成后 addChatMessage() 持久化 (IPC → main → chat-history.json)
 ```
 
-### 5.2 切换角色
+### 5.2 切换角色（实际）
 
 ```
 用户点击侧栏头像
-  → Sidebar → event-bus.emit('character:switch', { characterId })
-  → data-store: 更新当前角色
-  → theme: 如果角色的主题偏好不同，切换主题
-  → IPC: pet:sync-character → 桌宠窗口更新角色形象
-  → ChatPlugin: 重新加载该角色的聊天历史
+  → setActiveCharacter(id) (Zustand store)
+  → 聊天窗口重新加载该角色的聊天历史
+  → IPC broadcast (characters:updated) → 其他窗口同步
+  → 桌宠形象跟随变化（通过 Zustand store 共享 activeCharacterId）
 ```
 
-### 5.3 数据持久化
+### 5.3 数据持久化（实际）
 
 ```
 用户操作（修改设置/新建角色/发消息）
-  → 对应的 core/data-store 方法
-  → 写内存状态
-  → 写 localStorage（同步）
-  → 如果数据量增大，后续可迁移到 electron-store
-
-退出时：
-  before-quit → data-store.flush() → 确保所有数据已写入
+  → IPC invoke (renderer → main)
+  → main/ipc/index.ts: 写 JSON 文件到 %APPDATA%/ai-companion/
+  → IPC send 广播到所有窗口（characters:updated / api-profiles:updated 等）
 ```
 
 ---

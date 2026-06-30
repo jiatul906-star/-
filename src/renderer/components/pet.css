@@ -1,3 +1,28 @@
+/* ===== 主题变量（全局生效） ===== */
+:root {
+  --bg-primary: #FBF9F7;
+  --bg-card: #FFFFFF;
+  --text-primary: #3C3C3C;
+  --text-secondary: #999;
+  --border-subtle: rgba(0, 0, 0, 0.04);
+  --border-light: rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --bg-subtle: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] {
+  --bg-primary: #1E1B1A;
+  --bg-card: #242120;
+  --text-primary: #E8E4E1;
+  --text-secondary: #9A9590;
+  --border-subtle: #333030;
+  --border-light: #3A3635;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.32);
+  --bg-subtle: #2A2625;
+}
+
 /* ===== 桌宠窗口整体 ===== */
 .pet-window {
   position: fixed;
@@ -5,7 +30,7 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: red;
+  background: transparent;
   user-select: none;
   overflow: hidden;
   pointer-events: auto;
@@ -37,7 +62,7 @@
   margin: 16px auto 0;
   /* background 由 JSX inline style 控制（角色 gradient） */
   border-radius: 60px 60px 20px 20px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -50,6 +75,7 @@
   flex-direction: column;
   align-items: center;
   gap: 6px;
+  position: relative;
 }
 
 /* ===== 眼睛 ===== */
@@ -91,11 +117,18 @@
   border-radius: 0 0 50% 50%;
 }
 
+/* 委屈/难过表情 */
+.pet-mouth.sad {
+  border-bottom: none;
+  border-top: 3px solid #3C3C3C;
+  border-radius: 50% 50% 0 0;
+}
+
 /* ===== 自定义形象图片 ===== */
 .pet-image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: inherit;
 }
 
@@ -135,6 +168,35 @@
   }
 }
 
+/* 眼泪 */
+.pet-tear {
+  position: absolute;
+  width: 5px;
+  height: 7px;
+  background: #7DB8A8;
+  border-radius: 50%;
+  opacity: 0.7;
+  animation: petTearDrop 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.pet-tear.left {
+  left: calc(50% - 27px);
+  top: 28px;
+}
+
+.pet-tear.right {
+  right: calc(50% - 27px);
+  top: 28px;
+  animation-delay: 0.4s;
+}
+
+@keyframes petTearDrop {
+  0%, 100% { opacity: 0; transform: translateY(0); }
+  40% { opacity: 0.8; }
+  60% { opacity: 0.8; transform: translateY(6px); }
+}
+
 .feedback-emoji {
   font-size: 32px;
   line-height: 1;
@@ -157,6 +219,13 @@
   width: 100%;
   text-align: center;
   font-size: 10px;
-  color: rgba(0, 0, 0, 0.25);
+  color: var(--text-secondary);
   pointer-events: none;
+}
+/* ===== 暗色模式适配 ===== */
+[data-theme="dark"] .pet-body {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.32);
+}
+[data-theme="dark"] .pet-character {
+  background: transparent;
 }

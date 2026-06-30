@@ -35,8 +35,8 @@
 ├── frame: false（自绘标题栏）
 ├── transparent: false
 ├── resizable: true
-├── minWidth: 320, minHeight: 360
-├── width: 420, height: 600 (默认)
+├── minWidth: 680, minHeight: 480
+├── width: 960, height: 680 (默认)
 └── backgroundColor: 跟随主题主背景色
 ```
 

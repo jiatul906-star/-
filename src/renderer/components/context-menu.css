@@ -1,3 +1,56 @@
+/* ===== 主题变量（全局生效） ===== */
+:root {
+  --bg-primary: #FBF9F7;
+  --bg-card: #FFFFFF;
+  --text-primary: #3C3C3C;
+  --text-secondary: #999;
+  --border-subtle: rgba(0, 0, 0, 0.04);
+  --border-light: rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --bg-subtle: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] {
+  --bg-primary: #1E1B1A;
+  --bg-card: #242120;
+  --text-primary: #E8E4E1;
+  --text-secondary: #9A9590;
+  --border-subtle: #333030;
+  --border-light: #3A3635;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.32);
+  --bg-subtle: #2A2625;
+}
+
+/* ===== 聊天返回按钮 ===== */
+.ctx-chat-back {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 210;
+  background: rgba(255, 255, 255, 0.8);
+  border: none;
+  border-radius: 8px;
+  padding: 2px 10px;
+  font-size: 11px;
+  color: #555;
+  cursor: pointer;
+  font-family: inherit;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+.ctx-chat-back:hover {
+  background: rgba(255, 255, 255, 0.95);
+}
+[data-theme="dark"] .ctx-chat-back {
+  background: rgba(36, 33, 32, 0.8);
+  color: #E8E4E1;
+}
+[data-theme="dark"] .ctx-chat-back:hover {
+  background: rgba(36, 33, 32, 0.95);
+}
+
 /* ===== 背景遮罩 ===== */
 .context-backdrop {
   background: rgba(0, 0, 0, 0.15);
@@ -110,7 +163,11 @@
   line-height: 1.5;
   max-width: 85%;
   word-break: break-word;
-  transition: opacity 1.2s ease-out;
+  transition: opacity 1.2s ease-out, transform 0.8s ease-out;
+}
+
+.ctx-bubble.fading {
+  transform: translateY(-3px);
 }
 
 .ctx-bubble.user {
@@ -165,3 +222,14 @@
   background: rgba(0, 0, 0, 0.1);
   border-radius: 3px;
 }
+
+/* ===== 暗色模式适配 ===== */
+[data-theme="dark"] .context-backdrop { background: rgba(0, 0, 0, 0.35); }
+[data-theme="dark"] .ctx-action-btn { background: rgba(36, 33, 32, 0.94); box-shadow: 0 3px 14px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(36, 33, 32, 0.5); }
+[data-theme="dark"] .ctx-action-btn:hover { background: #2A2625; }
+[data-theme="dark"] .ctx-action-label { color: #E8E4E1; }
+[data-theme="dark"] .ctx-chat-bar { background: rgba(36, 33, 32, 0.94); box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(36, 33, 32, 0.5); }
+[data-theme="dark"] .ctx-chat-input { color: #E8E4E1; }
+[data-theme="dark"] .ctx-bubble.assistant { background: rgba(42, 38, 37, 0.94); color: #E8E4E1; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); }
+[data-theme="dark"] .ctx-bubble.assistant .ctx-bubble-role { color: #9A9590; }
+[data-theme="dark"] .ctx-chat-bubbles::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); }

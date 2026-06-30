@@ -49,7 +49,8 @@ export default function PetWindow() {
     [apiProfiles, activeProfileId],
   )
 
-  const [dragging, setDragging] = useState(false)
+ const [dragging, setDragging] = useState(false)
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
   const dragRef = useRef({
     active: false,
     confirmed: false,
@@ -59,8 +60,8 @@ export default function PetWindow() {
 
   // ---- 背景 + pointer-events ----
   useEffect(() => {
-    document.documentElement.style.background = 'red'
-    document.body.style.background = 'red'
+    document.documentElement.style.background = 'transparent'
+    document.body.style.background = 'transparent'
     document.documentElement.style.pointerEvents = 'auto'
     document.body.style.pointerEvents = 'auto'
     const root = document.getElementById('root')
@@ -72,15 +73,28 @@ export default function PetWindow() {
   }, [])
 
   // ---- 初始化 ----
-  useEffect(() => {
-    window.electronAPI.getPetActions().then(setActions)
-    window.electronAPI.getCharacters().then((data) => setCharactersData(data))
-    const unsubChars = window.electronAPI.onCharactersUpdated((data) => setCharactersData(data))
-    const unsubImage = window.electronAPI.onPetImageUpdated(({ charId, dataUrl }) =>
-      setCharacterImage(charId, dataUrl),
-    )
-    return () => { unsubChars(); unsubImage() }
+ useEffect(() => {
+   window.electronAPI.getPetActions().then(setActions)
+   window.electronAPI.getCharacters().then((data) => setCharactersData(data))
+   const unsubChars = window.electronAPI.onCharactersUpdated((data) => setCharactersData(data))
+    const unsubActions = window.electronAPI.onPetActionsUpdated((updated) => setActions(updated))
+   const unsubImage = window.electronAPI.onPetImageUpdated(({ charId, dataUrl }) =>
+     setCharacterImage(charId, dataUrl),
+   )
+    return () => { unsubChars(); unsubActions(); unsubImage() }
   }, [setActions, setCharactersData, setCharacterImage])
+
+  // ---- 网络状态监听 ----
+  useEffect(() => {
+    const goOnline = () => setIsOnline(true)
+    const goOffline = () => setIsOnline(false)
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [])
 
   // ---- 加载 API Profiles + 记忆 ----
   useEffect(() => {
@@ -207,11 +221,19 @@ export default function PetWindow() {
   }, [videoVisible, clearVideo])
 
   const handleSendChat = useCallback(
-    async (text: string) => {
-      // 添加用户消息
+   async (text: string) => {
       setChatMessages((prev) => [...prev, { role: 'user' as const, content: text }])
 
       if (!activeChar) return
+      const now = Date.now()
+      // 保存到聊天历史
+      window.electronAPI.addChatMessage(activeChar.id, {
+        id: 'popup_' + now,
+        role: 'user',
+        content: text,
+        timestamp: now,
+        characterId: activeChar.id,
+      }).catch(() => {})
 
       // 检查 API 配置
       const profile = activeChar.apiProfileId
@@ -248,8 +270,18 @@ export default function PetWindow() {
             return copy
           })
         }
-      } catch (err: any) {
-        if (err.name === 'AbortError') return
+        } catch (err: any) {
+          // 保存 AI 回复到聊天历史
+          if (activeChar && fullContent) {
+            window.electronAPI.addChatMessage(activeChar.id, {
+              id: 'popup_ai_' + now,
+              role: 'assistant',
+              content: fullContent,
+              timestamp: Date.now(),
+              characterId: activeChar.id,
+            }).catch(() => {})
+          }
+          if (err.name === 'AbortError') return
         setChatMessages((prev) => {
           const copy = [...prev]
           const last = copy[copy.length - 1]
@@ -274,6 +306,12 @@ export default function PetWindow() {
     closeMenu()
   }, [closeMenu])
 
+  const clearChat = useCallback(() => {
+    chatAbortRef.current?.abort()
+    setChatMessages([])
+    setIsChatStreaming(false)
+  }, [])
+
   const showCustomImage = !!activeChar?.imageDataUrl
 
   return (
@@ -281,6 +319,7 @@ export default function PetWindow() {
       <div
         ref={characterRef}
         className={`pet-character${dragging ? ' dragging' : ''}`}
+        data-offline={!isOnline ? 'true' : undefined}
         onContextMenu={onContextMenu}
         onMouseDown={onMouseDownChar}
         onClick={onClick}
@@ -289,12 +328,14 @@ export default function PetWindow() {
           <img className="pet-image" src={activeChar!.imageDataUrl!} alt={activeChar!.name} />
         )}
         {!showCustomImage && !videoVisible && activeChar && (
-          <div className="pet-body" style={{ background: activeChar.gradient }}>
-            <div className="pet-face">
-              <div className="pet-eyes"><div className="pet-eye left" /><div className="pet-eye right" /></div>
-              <div className="pet-mouth" />
-            </div>
-          </div>
+         <div className="pet-body" style={{ background: activeChar.gradient }}>
+           <div className="pet-face">
+             <div className="pet-eyes"><div className="pet-eye left" /><div className="pet-eye right" /></div>
+              <div className={`pet-mouth${!isOnline ? ' sad' : ''}`} />
+              {!isOnline && <div className="pet-tear left" />}
+              {!isOnline && <div className="pet-tear right" />}
+           </div>
+         </div>
         )}
         {!videoVisible && feedbackEmoji && (
           <div className="pet-feedback">
@@ -321,6 +362,7 @@ export default function PetWindow() {
         cy={menuOriginY}
         onAction={triggerAction}
         onClose={handleCloseMenu}
+        onBackToActions={clearChat}
         onSendChat={handleSendChat}
         chatMessages={chatMessages}
         isChatStreaming={isChatStreaming}

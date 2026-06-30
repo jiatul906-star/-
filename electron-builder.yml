@@ -6,7 +6,15 @@ files:
   - out/**/*
   - '!node_modules'
 win:
-  target:
-    - target: portable
-      arch: [x64]
   icon: resources/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+electronDist: node_modules/electron/dist
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: AI 伴侣
+  artifactName: AI伴侣 Setup ${version}.${ext}

@@ -8,56 +8,100 @@
 
 ## 一、IPC 通道定义
 
-所有通道名常量定义在 `src/shared/ipc-channels.ts`。
+> ⚠️ **权威源**：所有 IPC 通道以 `src/main/ipc/index.ts`（主进程注册）和 `src/preload/index.ts`（渲染进程暴露）为准。本节仅列概要，写代码前必须读取这两个文件。
 
-### 1.1 主窗口 ↔ 桌宠窗口
+### 渲染进程 ↔ 主进程
 
-| 通道名 | 方向 | 载荷 | 触发时机 |
-|--------|------|------|---------|
-| `pet:sync-character` | 主→宠 | `{ characterId: string, character: Character }` | 角色切换、角色数据更新 |
-| `pet:set-state` | 主→宠 | `{ state: PetState }` | 窗口状态变化（打开/关闭/最小化/最大化） |
-| `pet:set-position` | 主→宠 | `{ x: number, y: number }` | 主窗口移动/缩放，桌宠需要跟随 |
-| `pet:position-changed` | 宠→主 | `{ x: number, y: number }` | 用户拖拽桌宠到新位置 |
-| `pet:interaction` | 宠→主 | `{ type: 'poke' \| 'headpat' \| 'right-click' \| 'double-click', characterId: string }` | 用户与桌宠交互 |
+所有 API 通过 `window.electronAPI` 暴露，参见 `src/preload/index.ts`。
 
-### 1.2 渲染进程 ↔ 主进程
+#### 窗口控制
+| API | IPC 通道 | 说明 |
+|-----|----------|------|
+| `electronAPI.minimize()` | `window:minimize` | 最小化当前窗口 |
+| `electronAPI.maximize()` | `window:maximize` | 最大化/还原 |
+| `electronAPI.close()` | `window:close` | 关闭当前窗口 |
+| `electronAPI.quit()` | `app:quit` | 退出应用 |
 
-| 通道名 | 方向 | 载荷 | 返回 |
-|--------|------|------|------|
-| `tts:generate` | 渲染→主 | `{ text: string, characterId: string }` | `{ audioBuffer: ArrayBuffer }` |
-| `tts:status` | 主→渲染 | `{ available: boolean, reason?: string }` | — |
-| `file:upload-image` | 渲染→主 | `{ sourcePath: string }` | `{ savedPath: string, dataUrl: string }` |
-| `file:get-user-data-path` | 渲染→主 | — | `{ path: string }` |
-| `app:quit` | 渲染→主 | — | — |
-| `app:get-gpu-info` | 渲染→主 | — | `{ hasNvidia: boolean, vramMB: number }` |
-| `tray:update-icon` | 渲染→主 | `{ imageDataUrl: string }` | — |
+#### 桌宠
+| API | IPC 通道 | 说明 |
+|-----|----------|------|
+| `electronAPI.movePet(dx, dy)` | `window:movePet` | 拖拽移动桌宠窗口 |
+| `electronAPI.resizePet(expand, cx, cy)` | `window:resizePet` | 扩/缩桌宠窗口 |
+| `electronAPI.togglePetPassthrough()` | `window:togglePetPassthrough` | 切换鼠标穿透 |
+
+#### 角色持久化
+| API | IPC 通道 | 说明 |
+|-----|----------|------|
+| `electronAPI.getCharacters()` | `character:getAll` | 读取全部角色 |
+| `electronAPI.saveCharacters(data)` | `character:saveAll` | 保存并广播 |
+| `electronAPI.onCharactersUpdated(cb)` | `characters:updated` | 订阅角色变更 |
+
+#### API Profiles
+| API | IPC 通道 | 说明 |
+|-----|----------|------|
+| `electronAPI.getApiProfiles()` | `api-profiles:getAll` | 读取全部 API Profile |
+| `electronAPI.saveApiProfiles(data)` | `api-profiles:saveAll` | 保存并广播 |
+| `electronAPI.testApiConnection(profile)` | `api-profiles:test` | 测试 API 连接 |
+| `electronAPI.onApiProfilesUpdated(cb)` | `api-profiles:updated` | 订阅配置变更 |
+
+#### 聊天历史
+| API | IPC 通道 | 说明 |
+|-----|----------|------|
+| `electronAPI.getChatHistory(charId)` | `chat-history:get` | 读取角色聊天历史 |
+| `electronAPI.addChatMessage(charId, msg)` | `chat-history:add` | 追加消息 |
+| `electronAPI.clearChatHistory(charId)` | `chat-history:clear` | 清除历史 |
+
+#### 智能体记忆
+| API | IPC 通道 | 说明 |
+|-----|----------|------|
+| `electronAPI.getAgentMemory(charId)` | `agent-memory:getAll` | 读取记忆列表 |
+| `electronAPI.addAgentMemory(charId, entry)` | `agent-memory:add` | 添加记忆 |
+| `electronAPI.deleteAgentMemory(charId, id)` | `agent-memory:delete` | 删除记忆 |
+| `electronAPI.updateAgentMemory(charId, id, content)` | `agent-memory:update` | 更新记忆内容 |
+
+#### 桌宠动作
+| API | IPC 通道 | 说明 |
+|-----|----------|------|
+| `electronAPI.getPetActions()` | `pet-actions:getAll` | 读取动作列表 |
+| `electronAPI.savePetActions(actions)` | `pet-actions:save` | 保存动作列表 |
+
+#### 文件对话框
+| API | IPC 通道 | 说明 |
+|-----|----------|------|
+| `electronAPI.openImageDialog(charId)` | `dialog:openImage` | 选择角色形象图片 |
+| `electronAPI.openVideoDialog()` | `dialog:openVideo` | 选择动作绑定视频 |
+| `electronAPI.getPetImage(charId)` | `pet-image:getCurrent` | 读取已保存形象 |
+| `electronAPI.onPetImageUpdated(cb)` | `pet-image:updated` | 订阅形象更新 |
+
+#### 窗口间通信
+| API | IPC 通道 | 说明 |
+|-----|----------|------|
+| `electronAPI.openChat()` | `window:openChat` | 打开/聚焦聊天窗口 |
+| `electronAPI.openSettings()` | `window:openSettings` | 打开/聚焦设置窗口 |
+| `electronAPI.onPetMenuClose(cb)` | `pet:menuClose` | 桌宠菜单关闭通知 |
 
 ---
 
-## 二、事件总线（插件间通信）
+## 二、事件总线（渲染进程内插件通信）
 
-插件不直接引用其他插件，通过 `core/event-bus` 收发事件。
+> ⚠️ **当前状态**：事件总线在 `src/renderer/core/event-bus.ts` 中定义，但实际代码主要通过 Zustand store (`pet-store.ts`) 和 IPC 广播实现状态同步。事件总线使用有限，新功能应优先考虑 Zustand + IPC 广播模式。
 
 ### 事件列表
 
 | 事件名 | 发出者 | 载荷 | 说明 |
 |--------|--------|------|------|
 | `character:switch` | Sidebar / Tray | `{ characterId: string }` | 切换当前活跃角色 |
-| `character:created` | diy plugin | `{ character: Character }` | 新建角色完成 |
-| `character:updated` | diy plugin | `{ characterId: string, changes: Partial<Character> }` | 角色数据修改 |
+| `character:created` | diy plugin | `{ character: CharacterConfig }` | 新建角色完成 |
+| `character:updated` | diy plugin | `{ characterId: string, changes: Partial<CharacterConfig> }` | 角色数据修改 |
 | `character:deleted` | diy plugin | `{ characterId: string }` | 角色被删除 |
 | `message:send` | InputBar | `{ text: string, characterId: string }` | 用户发送消息 |
-| `message:received` | chat plugin (api) | `{ message: Message }` | AI 返回完整消息 |
-| `message:streaming` | chat plugin (api) | `{ characterId: string, text: string, isComplete: boolean }` | 流式输出中，逐 token |
-| `tts:play` | chat plugin | `{ text: string, characterId: string }` | 请求播放 TTS |
-| `tts:stop` | chat plugin | — | 打断当前播放 |
-| `tts:playing` | tts plugin | `{ characterId: string, progress: number }` | 播放进度 |
-| `tts:complete` | tts plugin | `{ characterId: string }` | 播放完成 |
-| `pet:animate` | 任意插件 | `{ characterId: string, animation: AnimationName }` | 请求桌宠播动画 |
+| `message:received` | chat plugin | `{ message: ChatMessage }` | AI 返回完整消息 |
+| `message:streaming` | chat plugin | `{ characterId: string, text: string, isComplete: boolean }` | 流式输出中 |
+| `pet:animate` | 任意插件 | `{ characterId: string, animation: string }` | 请求桌宠播动画 |
 | `theme:changed` | theme engine | `{ theme: string, mode: 'light' \| 'dark' }` | 主题切换 |
-| `window:state-changed` | window manager | `{ state: 'normal' \| 'minimized' \| 'maximized' \| 'closed' }` | 主窗口状态变化 |
-| `settings:open` | 任意插件 | `{ tab?: string }` | 打开设置弹窗，可选指定标签 |
-| `settings:close` | settings plugin | — | 关闭设置弹窗 |
+| `window:state-changed` | window manager | `{ state: string }` | 主窗口状态变化 |
+| `settings:open` | 任意插件 | `{ tab?: string }` | 打开设置窗口 |
+| `settings:close` | settings plugin | — | 关闭设置窗口 |
 
 ### 使用方式
 
@@ -76,247 +120,141 @@ eventBus.off('character:switch', handler);
 
 ---
 
-## 三、数据层接口
+## 三、数据持久化
 
-### 3.1 DataStore
+> ⚠️ **当前实现**：数据持久化通过 IPC 通道 + JSON 文件实现（非 DataStore 抽象层）。所有数据文件存储在 `%APPDATA%/ai-companion/`。
 
-```typescript
-interface DataStore {
-  // 角色 CRUD
-  getCharacters(): Character[];
-  getCharacter(id: string): Character | null;
-  getActiveCharacter(): Character | null;
-  createCharacter(data: CreateCharacterInput): Character;
-  updateCharacter(id: string, changes: Partial<Character>): void;
-  deleteCharacter(id: string): void;
-  setActiveCharacter(id: string): void;
+### 3.1 IPC 持久化通道
 
-  // 聊天记录
-  getChatHistory(characterId: string): Message[];
-  addMessage(characterId: string, message: Message): void;
-  clearHistory(characterId: string): void;
+详见 `src/main/ipc/index.ts` 和 `src/preload/index.ts`。所有读写操作通过 `window.electronAPI` 暴露给渲染进程。
 
-  // 设置
-  getSettings(): AppSettings;
-  updateSettings(changes: Partial<AppSettings>): void;
-}
-```
+### 3.2 持久化文件
 
-### 3.2 localStorage 键名
-
-| 键 | 值类型 | 说明 |
-|----|--------|------|
-| `characters` | `Character[]` | 所有角色数据 |
-| `activeCharacterId` | `string` | 当前选中角色 ID |
-| `chatHistory:{characterId}` | `Message[]` | 每个角色的聊天记录 |
-| `settings` | `AppSettings` | 应用设置（API/主题/密度） |
-
-**注意**：键名格式统一。所有键名常量定义在 `src/shared/constants.ts`。
+| 文件 | 内容 | 对应 IPC 通道 |
+|------|------|-------------|
+| `characters.json` | `CharactersData { characters, activeId }` | `character:getAll` / `character:saveAll` |
+| `api-profiles.json` | `ApiProfilesData { profiles, activeProfileId }` | `api-profiles:getAll` / `api-profiles:saveAll` |
+| `chat-history.json` | `Record<string, ChatMessage[]>` | `chat-history:get` / `chat-history:add` / `chat-history:clear` |
+| `agent-memory.json` | `Record<string, MemoryEntry[]>` | `agent-memory:getAll` / `agent-memory:add` / `agent-memory:delete` / `agent-memory:update` |
+| `pet-actions.json` | `{ actions: PetAction[] }` | `pet-actions:getAll` / `pet-actions:save` |
+| `pet-image-{charId}.png` | 角色自定义形象图片 | `dialog:openImage` / `pet-image:getCurrent` |
 
 ---
 
-## 四、主题引擎接口
+## 四、主题系统
 
-```typescript
-// src/core/theme.ts
+> ⚠️ **当前实现**：主题通过 CSS 变量 + `App.tsx` 中的 `data-theme` / `data-density` 属性控制，持久化在 `characters.json` 或设置中。`AppSettings.theme` 和 `AppSettings.density` 定义见 `src/common/types.ts`。
 
-interface ThemeEngine {
-  setTheme(name: ThemeName): void;
-  // 'peach' | 'mint' | 'lavender' | 'coffee' | 'sakura'
-  // → 写入 <html class="theme-{name}">
-  // → 所有 CSS 变量对应色系值
+## 五、TTS 服务接口 ❌（整阶段未启动）
 
-  setMode(mode: 'light' | 'dark'): void;
-  // → 叠加 <html class="dark">（暗色时）
-  // → 移除 dark class（浅色时）
-
-  setDensity(density: 'comfort' | 'compact'): void;
-  // → <html class="density-{mode}">
-
-  getCurrent(): { theme: ThemeName; mode: 'light' | 'dark'; density: 'comfort' | 'compact' };
-}
-
-type ThemeName = 'peach' | 'mint' | 'lavender' | 'coffee' | 'sakura';
-```
-
----
-
-## 五、TTS HTTP 服务接口
-
-IndexTTS Python 子进程监听 `localhost:9876`。
-
-### POST /tts
-
-**请求**：
-```json
-{
-  "text": "你好，今天天气不错",
-  "reference_audio": "E:\\app\\reference_audio\\xiaotao_ref.wav"
-}
-```
-
-**成功响应**：
-```
-HTTP 200
-Content-Type: audio/mpeg
-{binary mp3 data}
-```
-
-**错误响应**：
-```json
-{
-  "error": "cuda_out_of_memory",
-  "message": "显存不足"
-}
-```
-
-### GET /health
-
-**成功响应**：
-```json
-{
-  "status": "ready",
-  "gpu": "NVIDIA GeForce RTX 3060",
-  "vram_total_mb": 12288,
-  "vram_free_mb": 8192
-}
-```
-
-### Python 进程生命周期
-
-```
-启动：Electron 主进程 spawn('python', ['-m', 'index_tts', '--port', '9876'])
-等待：轮询 GET /health（间隔 500ms，最多等 30s）
-      → 超时 → 弹错误提示，TTS 功能不可用
-      → 就绪 → 注册 tts:generate IPC handler
-关闭：app.on('before-quit') → POST /shutdown → 等 5s → kill
-```
+> TTS（P5）尚未实现。方案曾选为 IndexTTS（Python 子进程），启动前需重新评估。
 
 ---
 
 ## 六、数据类型
 
-### 6.1 Character
+> ⚠️ **权威源**：所有类型定义以 `src/common/types.ts` 为准。本节仅提供概要，写代码前必须读取 `src/common/types.ts` 确认最新定义。
+
+### 6.1 CharacterConfig
 
 ```typescript
-interface Character {
-  id: string;                   // UUID
-  name: string;                 // 角色名
-  isDefault: boolean;           // 是否为官方预制角色（不可删除）
-  
-  // 外观
-  standImage: string;           // 立绘（data URL 或文件路径）
-  avatarImage: string;          // 圆形头像
-  petImage: string;             // 桌宠本体图（透明背景）
-  
-  // 桌宠动画帧（可选，无素材时降级为静态图）
-  petAnimations?: {
-    idle: string[];             // 帧图 data URLs 或路径
-    blink: string[];
-    talk: string[];
-    grabbed: string;
-    jump_on: string[];
-    jump_off: string[];
-    react_happy: string[];
-    react_shy: string[];
-    react_angry: string[];
-    think: string[];
-    sad: string[];
-    silent: string[];
-  };
-
-  // 性格
-  personalityTags: string[];    // ["温柔", "话唠"]
-  personalityText: string;      // 自由文本描述
-
-  // 声音
-  referenceAudio: string;       // 参考音频路径（3-5秒）
-  voiceSpeed: number;           // 语速 0.5-2.0，默认 1.0
-  voicePitch: number;           // 音调 0.5-2.0，默认 1.0
-  voiceVolume: number;          // 音量 0.0-1.0，默认 0.8
-
-  // 元数据
-  createdAt: number;            // timestamp
-  updatedAt: number;            // timestamp
+// 见 src/common/types.ts
+interface CharacterConfig {
+  id: string
+  name: string
+  gradient: string              // CSS gradient 色值
+  imageDataUrl: string | null   // null = 使用 CSS 默认形象
+  personality: string           // 性格描述（AI System Prompt 核心）
+  voiceId: string
+  speechStyle: string           // 说话风格
+  apiProfileId?: string         // 角色专属 API Profile ID
 }
 ```
 
-### 6.2 Message
+### 6.2 ChatMessage
 
 ```typescript
-interface Message {
-  id: string;                   // UUID
-  characterId: string;          // 属于哪个角色的对话
-  role: 'user' | 'assistant';
-  text: string;
-  timestamp: number;
+// 见 src/common/types.ts
+interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  timestamp: number
+  characterId: string
 }
 ```
 
-### 6.3 AppSettings
+### 6.3 ApiProfile
 
 ```typescript
+// 见 src/common/types.ts
+interface ApiProfile {
+  id: string
+  name: string
+  baseUrl: string
+  apiKey: string
+  model: string
+  isActive: boolean
+  maxTokens?: number
+  temperature?: number
+  createdAt: number
+  updatedAt: number
+}
+```
+
+### 6.4 MemoryEntry
+
+```typescript
+// 见 src/common/types.ts
+interface MemoryEntry {
+  id: string
+  content: string
+  source: 'ai-extracted' | 'user-explicit'
+  createdAt: number
+  updatedAt: number
+}
+```
+
+### 6.5 PetAction
+
+```typescript
+// 见 src/common/types.ts
+interface PetAction {
+  id: string
+  label: string
+  emoji: string
+  videoPath: string
+  order: number
+  type: 'normal' | 'chat' | 'settings'
+}
+```
+
+### 6.6 AppSettings
+
+```typescript
+// 见 src/common/types.ts
 interface AppSettings {
-  // AI
-  apiUrl: string;               // OpenAI 兼容 API endpoint
-  apiKey: string;               // API Key
-  model: string;                // 模型名（由 API 决定可用值）
-
-  // 界面
-  theme: ThemeName;
-  mode: 'light' | 'dark';
-  density: 'comfort' | 'compact';
-
-  // TTS
-  ttsEnabled: boolean;          // 全局 TTS 开关
+  theme: 'warm-peach' | 'mint' | 'lavender' | 'milk-coffee' | 'sakura'
+  density: 'comfortable' | 'compact'
 }
 ```
 
-### 6.4 预制角色数据
+### 6.7 预制角色数据
 
-4 个官方角色（`isDefault: true`，不可删除）：
+| 角色 | 描述 |
+|------|------|
+| 小桃 | 暖桃色渐变，默认角色 |
+| 小蓝 | 蓝色渐变 |
 
-| 角色 | 性格标签 | 性格描述 |
-|------|---------|---------|
-| 小桃 | 元气, 活泼 | 阳光开朗的少女，说话充满活力，喜欢用感叹号 |
-| 小黑 | 傲娇, 毒舌 | 表面冷淡嘴巴不饶人，其实内心很关心你 |
-| 小雪 | 温柔, 安静 | 说话轻柔，善解人意，像冬日里的暖茶 |
-| 小灰 | 冷淡, 理性 | 话不多但句句到位，逻辑清晰，偶尔蹦出冷笑话 |
+> 注：当前仅 2 个默认角色（`DEFAULT_CHARACTERS`），计划扩展至 4 个。
 
 ---
 
-## 七、插件接口规范
+## 六、插件系统
 
-每个插件目录下的 `index.ts` 必须 export：
+> ⚠️ **当前状态**：插件框架已在 `src/renderer/core/plugin.ts` 中定义，但实际功能代码主要在 `src/renderer/components/` 和 `src/renderer/stores/` 中。`plugins/chat/` 有 `api.ts` + `index.ts` 可用，`plugins/diy/`、`plugins/pet/`、`plugins/tts/` 为空白或占位。
 
-```typescript
-export const plugin: Plugin = {
-  id: 'chat',                              // 唯一，与目录名一致
-  name: '聊天',                             // 显示名
-  components: {
-    ChatArea: ChatAreaComponent,            // 注册到壳的组件
-    InputBar: InputBarComponent,
-    // 壳通过 plugin.components['ChatArea'] 获取组件
-  },
-  activate(ctx: PluginContext) {
-    // 订阅事件、初始化状态
-    ctx.eventBus.on('character:switch', this.onCharacterSwitch);
-  },
-  deactivate() {
-    // 取消订阅、清理状态
-  }
-};
-```
-
-**规则**：
-- `activate` 在壳初始化时调用（按依赖顺序）
-- `deactivate` 在应用退出或插件热替换时调用
-- 插件不持有其他插件的引用，只能通过 `ctx.eventBus` 通信
-- 插件的 React 组件通过壳的组件注册表被渲染，不自己挂载到 DOM
-
----
-
-## 八、接口变更流程
+## 七、接口变更流程
 
 1. 修改本文档对应的接口定义
 2. `git grep` 搜索所有调用方
