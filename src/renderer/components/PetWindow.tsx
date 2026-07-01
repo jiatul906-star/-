@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useMemo, useState } from 'react'
 import { usePetStore } from '../stores/pet-store'
 import ContextMenu from './ContextMenu'
+import ChromaKeyVideo from './ChromaKeyVideo'
 import { streamChat, buildSystemPrompt } from '../plugins/chat/api'
 import type { ApiProfile, MemoryEntry } from '../../common/types'
 import './pet.css'
@@ -29,6 +30,7 @@ export default function PetWindow() {
     closeMenu: closeMenuStore,
     triggerAction,
     clearVideo,
+    currentActionMeta,
   } = usePetStore()
 
   const activeChar = useMemo(
@@ -344,14 +346,33 @@ export default function PetWindow() {
           </div>
         )}
         {videoVisible && currentVideo && (
-          <video className="pet-video" src={currentVideo} autoPlay
-            onEnded={clearVideo}
-            onError={() => {
-              clearVideo()
-              usePetStore.setState({ feedbackEmoji: '❌', feedbackLabel: '视频加载失败' })
-              setTimeout(() => usePetStore.setState({ feedbackEmoji: null, feedbackLabel: null }), 2000)
-            }}
-          />
+          (currentActionMeta?.cropX != null || currentActionMeta?.cropY != null || currentActionMeta?.cropW != null || currentActionMeta?.cropH != null || currentActionMeta?.chromaKey) ? (
+            <ChromaKeyVideo
+              videoPath={currentVideo?.replace(/^file:\/\/\//, '') || ''}
+              chromaKey={currentActionMeta?.chromaKey}
+              tolerance={currentActionMeta?.chromaKeyTolerance}
+              cropX={currentActionMeta?.cropX}
+              cropY={currentActionMeta?.cropY}
+              cropW={currentActionMeta?.cropW}
+              cropH={currentActionMeta?.cropH}
+              onEnded={clearVideo}
+              onError={() => {
+                clearVideo()
+                usePetStore.setState({ feedbackEmoji: '❌', feedbackLabel: '视频加载失败' })
+                setTimeout(() => usePetStore.setState({ feedbackEmoji: null, feedbackLabel: null }), 2000)
+              }}
+              className="pet-video"
+            />
+          ) : (
+            <video className="pet-video" src={currentVideo} autoPlay
+              onEnded={clearVideo}
+              onError={() => {
+                clearVideo()
+                usePetStore.setState({ feedbackEmoji: '❌', feedbackLabel: '视频加载失败' })
+                setTimeout(() => usePetStore.setState({ feedbackEmoji: null, feedbackLabel: null }), 2000)
+              }}
+            />
+          )
         )}
       </div>
 

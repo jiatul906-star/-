@@ -132,6 +132,14 @@ export interface PetAction {
   videoPath: string // 空字符串表示未配置视频
   order: number
   type: 'normal' | 'chat' | 'settings'
+  trimStart?: number       // 视频裁切起始时间（秒），可选
+  trimEnd?: number         // 视频裁切结束时间（秒），可选
+  chromaKey?: string       // 色度键去底颜色（如 '#00FF00'），空=不启用
+  chromaKeyTolerance?: number // 色度键容差 0-255，默认 100
+  cropX?: number            // 画面裁切 X%（0-100），可选
+  cropY?: number            // 画面裁切 Y%（0-100），可选
+  cropW?: number            // 画面裁切宽度%（0-100），可选
+  cropH?: number            // 画面裁切高度%（0-100），可选
 }
 
 export const DEFAULT_PET_ACTIONS: PetAction[] = [

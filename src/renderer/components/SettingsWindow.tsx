@@ -5,6 +5,7 @@ import { usePetStore } from '../stores/pet-store'
 import { buildSystemPrompt } from '../plugins/chat/api'
 import ActionEditor from './ActionEditor'
 import ImageCropper from './ImageCropper'
+import BackgroundRemover from './BackgroundRemover'
 import './settings.css'
 
 type NavKey = 'appearance' | 'actions' | 'about' | 'api'
@@ -52,6 +53,7 @@ export default function SettingsWindow() {
   const [name, setName] = useState('')
   const [cropImageUrl, setCropImageUrl] = useState<string | null>(null)
   const [petImagePreview, setPetImagePreview] = useState<string | null>(null)
+  const [bgRemoverOpen, setBgRemoverOpen] = useState(false)
   const [personality, setPersonality] = useState('')
   const [speechStyle, setSpeechStyle] = useState('')
   const [charApiProfileId, setCharApiProfileId] = useState('')
@@ -224,6 +226,17 @@ export default function SettingsWindow() {
   const handleCropCancel = useCallback(() => {
     setCropImageUrl(null)
   }, [])
+
+  const handleBgRemoveConfirm = useCallback((resultDataUrl: string) => {
+    if (!activeChar) return
+    setBgRemoverOpen(false)
+    setCharacterImage(activeChar.id, resultDataUrl)
+    setPetImagePreview(resultDataUrl)
+    const updated = { ...activeChar, imageDataUrl: resultDataUrl }
+    updateCharacter(updated)
+    const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
+    persist(all, activeCharacterId)
+  }, [activeChar, characters, activeCharacterId, updateCharacter, setCharacterImage, persist])
 
   const toggleTheme = useCallback(() => {
     setThemeMode((prev) => {
@@ -458,6 +471,13 @@ export default function SettingsWindow() {
 
         {/* 右侧内容 */}
         <div className="settings-content">
+          {bgRemoverOpen && petImagePreview && (
+            <BackgroundRemover
+              imageUrl={petImagePreview}
+              onConfirm={handleBgRemoveConfirm}
+              onCancel={() => setBgRemoverOpen(false)}
+            />
+          )}
           {cropImageUrl && (
             <ImageCropper
               imageUrl={cropImageUrl}
@@ -499,6 +519,7 @@ export default function SettingsWindow() {
                         <img className="pet-image-preview" src={petImagePreview} alt="桌宠形象预览" />
                         <div className="pet-image-actions">
                           <button className="pet-image-change-btn" onClick={handleUploadImage}>更换图片</button>
+                          <button className="pet-image-reset-btn" onClick={() => setBgRemoverOpen(true)}>移除背景</button>
                           <button className="pet-image-reset-btn" onClick={handleClearImage}>使用默认形象</button>
                         </div>
                       </div>

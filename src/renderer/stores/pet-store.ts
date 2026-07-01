@@ -14,6 +14,9 @@ interface PetState {
   currentVideo: string | null
   videoVisible: boolean
 
+  // 当前播放动作的元数据（裁切/色度键）
+  currentActionMeta: Partial<PetAction> | null
+
   // 反馈（无视频时）
   feedbackEmoji: string | null
   feedbackLabel: string | null
@@ -79,6 +82,16 @@ export const usePetStore = create<PetState>((set, get) => ({
     if (action.videoPath) {
       set({
         currentVideo: `file:///${action.videoPath.replace(/\\/g, '/')}`,
+        currentActionMeta: {
+          trimStart: action.trimStart,
+          trimEnd: action.trimEnd,
+          chromaKey: action.chromaKey,
+          chromaKeyTolerance: action.chromaKeyTolerance,
+          cropX: action.cropX,
+          cropY: action.cropY,
+          cropW: action.cropW,
+          cropH: action.cropH,
+        },
         videoVisible: true,
         menuVisible: false,
       })
@@ -92,7 +105,7 @@ export const usePetStore = create<PetState>((set, get) => ({
     }
   },
 
-  clearVideo: () => set({ videoVisible: false, currentVideo: null }),
+  clearVideo: () => set({ videoVisible: false, currentVideo: null, currentActionMeta: null }),
 
   // ===== 角色操作 =====
   setCharactersData: (data) =>

@@ -21,6 +21,7 @@ export function createPetWindow(): BrowserWindow {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      webSecurity: false,
     },
   })
 

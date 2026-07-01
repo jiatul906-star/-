@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import type { PetAction } from '../../common/types'
+import VideoCropper from './VideoCropper'
+import VideoChromaPicker from './VideoChromaPicker'
 
 interface Props {
   actions: PetAction[]
@@ -14,6 +16,8 @@ export default function ActionEditor({ actions, onSave }: Props) {
   )
   const [editingId, setEditingId] = useState<string | null>(null)
   const [addMode, setAddMode] = useState(false)
+  const [cropperVideoPath, setCropperVideoPath] = useState<string | null>(null)
+  const [chromaPickerOpen, setChromaPickerOpen] = useState(false)
 
   // 编辑中的表单
   const [form, setForm] = useState<PetAction>({
@@ -35,7 +39,7 @@ export default function ActionEditor({ actions, onSave }: Props) {
 
   const startAdd = () => {
     const newAction: PetAction = {
-      id: `custom_${nextId++}`,
+      id: 'custom_' + (nextId++),
       label: '新动作',
       emoji: '❓',
       videoPath: '',
@@ -93,10 +97,19 @@ export default function ActionEditor({ actions, onSave }: Props) {
     onSave(reordered)
   }
 
+  const handleCropperConfirm = (cx: number, cy: number, cw: number, ch: number) => {
+    setForm((f) => ({ ...f, cropX: cx, cropY: cy, cropW: cw, cropH: ch }))
+    setCropperVideoPath(null)
+  }
+
+  const handleClearCrop = () => {
+    setForm((f) => ({ ...f, cropX: undefined, cropY: undefined, cropW: undefined, cropH: undefined }))
+  }
+
   const handleBrowseVideo = async () => {
-    const path = await window.electronAPI.openVideoDialog()
-    if (path) {
-      setForm((f) => ({ ...f, videoPath: path }))
+    const selectedPath = await window.electronAPI.openVideoDialog()
+    if (selectedPath) {
+      setForm((f) => ({ ...f, videoPath: selectedPath }))
     }
   }
 
@@ -129,87 +142,86 @@ export default function ActionEditor({ actions, onSave }: Props) {
               {action.emoji}
             </span>
 
-            {/* 标签 & 视频路径 */}
+            {/* 标签 & 视频路径 + 裁切/去底标记 */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 500 }}>{action.label}</div>
               <div style={{ fontSize: 11, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {sys ? '系统动作' : action.videoPath || '无视频'}
+                {(action.cropX != null || action.cropY != null || action.cropW != null || action.cropH != null) && (
+                  <span style={{ color: '#E8927C', marginLeft: 6 }}>✂ 已裁切</span>
+                )}
+                {action.chromaKey && (
+                  <span style={{ color: '#7DB8A8', marginLeft: 4 }}>🎨 去底</span>
+                )}
               </div>
             </div>
 
             {/* 操作按钮 */}
             {!editing && (
               <>
-                <button
-                  onClick={() => moveUp(idx)}
-                  disabled={idx === 0}
-                  style={btnStyle(idx === 0)}
-                  title="上移"
-                >
-                  ▲
-                </button>
-                <button
-                  onClick={() => moveDown(idx)}
-                  disabled={idx === sorted.length - 1}
-                  style={btnStyle(idx === sorted.length - 1)}
-                  title="下移"
-                >
-                  ▼
-                </button>
-                <button onClick={() => startEdit(action)} style={btnStyle(false)} title="编辑">
-                  ✎
-                </button>
-                <button
-                  onClick={() => deleteAction(action.id)}
-                  disabled={sys}
-                  style={{
-                    ...btnStyle(sys),
-                    color: sys ? '#ccc' : '#E8927C',
-                  }}
-                  title={sys ? '系统动作不可删除' : '删除'}
-                >
-                  ✕
-                </button>
+                <button onClick={() => moveUp(idx)} disabled={idx === 0} style={btnStyle(idx === 0)} title="上移">▲</button>
+                <button onClick={() => moveDown(idx)} disabled={idx === sorted.length - 1} style={btnStyle(idx === sorted.length - 1)} title="下移">▼</button>
+                <button onClick={() => startEdit(action)} style={btnStyle(false)} title="编辑">✎</button>
+                <button onClick={() => deleteAction(action.id)} disabled={sys} style={{ ...btnStyle(sys), color: sys ? '#ccc' : '#E8927C' }} title={sys ? '系统动作不可删除' : '删除'}>✕</button>
               </>
             )}
 
             {/* 编辑表单 */}
             {editing && (
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                <input
-                  value={form.emoji}
-                  onChange={(e) => setForm((f) => ({ ...f, emoji: e.target.value }))}
-                  style={inputStyle}
-                  placeholder="图标"
-                  maxLength={4}
-                  title="emoji 图标"
-                />
-                <input
-                  value={form.label}
-                  onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
-                  style={{ ...inputStyle, width: 70 }}
-                  placeholder="名称"
-                />
-                <input
-                  value={form.videoPath}
-                  onChange={(e) => setForm((f) => ({ ...f, videoPath: e.target.value }))}
-                  style={{ ...inputStyle, width: 130 }}
-                  placeholder="视频路径"
-                  readOnly
-                  title={form.videoPath}
-                />
-                <button onClick={handleBrowseVideo} style={btnStyle(false)} title="浏览视频">
-                  📁
-                </button>
-                <button
-                  onClick={saveEdit}
-                  style={{ ...btnStyle(false), color: '#7DB8A8', fontWeight: 600 }}
-                >
-                  ✓
-                </button>
-                <button onClick={cancelEdit} style={btnStyle(false)}>
-                  ✕
-                </button>
+                <input value={form.emoji} onChange={(e) => setForm((f) => ({ ...f, emoji: e.target.value }))} style={inputStyle} placeholder="图标" maxLength={4} title="emoji 图标" />
+                <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} style={{ ...inputStyle, width: 70 }} placeholder="名称" />
+                <input value={form.videoPath} onChange={(e) => setForm((f) => ({ ...f, videoPath: e.target.value }))} style={{ ...inputStyle, width: 130 }} placeholder="视频路径" readOnly title={form.videoPath} />
+                <button onClick={() => setCropperVideoPath(form.videoPath)} disabled={!form.videoPath} style={btnStyle(!form.videoPath)} title={form.videoPath ? '裁切画面' : '请先选择视频'}>✂</button>
+                {(form.cropX != null || form.cropY != null || form.cropW != null || form.cropH != null) && (
+                  <button onClick={handleClearCrop} style={{ ...btnStyle(false), color: '#E8927C' }} title="清除裁切">↺</button>
+                )}
+                <button onClick={handleBrowseVideo} style={btnStyle(false)} title="浏览视频">📁</button>
+                <button onClick={saveEdit} style={{ ...btnStyle(false), color: '#7DB8A8', fontWeight: 600 }}>✓</button>
+                <button onClick={cancelEdit} style={btnStyle(false)}>✕</button>
+
+                {/* 色度键去底 */}
+                {form.videoPath && (
+                  <button onClick={() => setChromaPickerOpen(true)} style={{
+                    width: '100%', padding: '10px', borderRadius: 8, border: '1px solid #ddd',
+                    background: form.chromaKey ? '#FFE8E0' : '#F5F3F1', cursor: 'pointer',
+                    fontFamily: 'inherit', fontSize: 14, fontWeight: 500, marginTop: 4,
+                    color: form.chromaKey ? '#E8927C' : '#999',
+                  }}>
+                    🎬 视频去底 {form.chromaKey ? (`${form.chromaKey}`) : ''}
+                  </button>
+                )}
+
+                {/* 视频去底弹窗 */}
+                {chromaPickerOpen && form.videoPath && (
+                  <div className="crop-overlay" style={{ marginTop: 4 }}>
+                    <VideoChromaPicker
+                      videoPath={form.videoPath}
+                      currentChromaKey={form.chromaKey}
+                      currentTolerance={form.chromaKeyTolerance}
+                      onConfirm={(color, tolerance) => {
+                        setForm((f) => ({ ...f, chromaKey: color, chromaKeyTolerance: tolerance }))
+                        setChromaPickerOpen(false)
+                      }}
+                      onCancel={() => setChromaPickerOpen(false)}
+                    />
+                  </div>
+                )}
+
+                {/* 裁切弹窗 */}
+                {cropperVideoPath && (
+                  <div className="crop-overlay" style={{ marginTop: 8 }}>
+                    <VideoCropper
+                      videoPath={cropperVideoPath}
+                      currentCropX={form.cropX}
+                      currentCropY={form.cropY}
+                      currentCropW={form.cropW}
+                      currentCropH={form.cropH}
+                      onConfirm={handleCropperConfirm}
+                      onCancel={() => setCropperVideoPath(null)}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -218,59 +230,20 @@ export default function ActionEditor({ actions, onSave }: Props) {
 
       {/* 添加按钮 */}
       {!addMode && editingId === null && (
-        <button
-          onClick={startAdd}
-          style={{
-            width: '100%',
-            padding: '10px',
-            border: '2px dashed #ddd',
-            borderRadius: 10,
-            background: 'transparent',
-            cursor: 'pointer',
-            fontSize: 13,
-            color: '#999',
-            fontFamily: 'inherit',
-            marginTop: 8,
-          }}
-        >
-          ＋ 添加新动作
-        </button>
+        <button onClick={startAdd} style={{ width: '100%', padding: '10px', border: '2px dashed #ddd', borderRadius: 10, background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#999', fontFamily: 'inherit', marginTop: 8 }}>＋ 添加新动作</button>
       )}
 
-      {/* 新增模式下的空编辑行 */}
+      {/* 新增模式下的编辑行 */}
       {addMode && (
         <div style={{ marginTop: 8, padding: 12, background: '#fff', borderRadius: 10, border: '1px solid #E0DDD8' }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <input
-              value={form.emoji}
-              onChange={(e) => setForm((f) => ({ ...f, emoji: e.target.value }))}
-              style={inputStyle}
-              placeholder="图标"
-              maxLength={4}
-            />
-            <input
-              value={form.label}
-              onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
-              style={{ ...inputStyle, width: 80 }}
-              placeholder="名称"
-            />
-            <input
-              value={form.videoPath}
-              onChange={(e) => setForm((f) => ({ ...f, videoPath: e.target.value }))}
-              style={{ ...inputStyle, width: 160 }}
-              placeholder="视频路径（留空 = emoji 反馈）"
-              readOnly
-              title={form.videoPath}
-            />
-            <button onClick={handleBrowseVideo} style={btnStyle(false)}>
-              📁
-            </button>
-            <button onClick={saveEdit} style={{ ...btnStyle(false), color: '#7DB8A8', fontWeight: 600 }}>
-              ✓ 添加
-            </button>
-            <button onClick={cancelEdit} style={btnStyle(false)}>
-              取消
-            </button>
+            <input value={form.emoji} onChange={(e) => setForm((f) => ({ ...f, emoji: e.target.value }))} style={inputStyle} placeholder="图标" maxLength={4} />
+            <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} style={{ ...inputStyle, width: 80 }} placeholder="名称" />
+            <input value={form.videoPath} onChange={(e) => setForm((f) => ({ ...f, videoPath: e.target.value }))} style={{ ...inputStyle, width: 160 }} placeholder="视频路径（留空 = emoji 反馈）" readOnly title={form.videoPath} />
+            <button onClick={() => setCropperVideoPath(form.videoPath)} disabled={!form.videoPath} style={btnStyle(!form.videoPath)} title="裁切画面">✂</button>
+            <button onClick={handleBrowseVideo} style={btnStyle(false)}>📁</button>
+            <button onClick={saveEdit} style={{ ...btnStyle(false), color: '#7DB8A8', fontWeight: 600 }}>✓ 添加</button>
+            <button onClick={cancelEdit} style={btnStyle(false)}>取消</button>
           </div>
         </div>
       )}
