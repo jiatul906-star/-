@@ -374,7 +374,11 @@ export default function ChatWindow() {
           <>
             <div
               className="chat-titlebar-avatar"
-              style={{ background: activeChar.gradient }}
+              style={{
+                background: activeChar.avatarDataUrl
+                  ? `url(${activeChar.avatarDataUrl}) center/cover no-repeat`
+                  : activeChar.gradient,
+              }}
             />
             <span className="chat-titlebar-name">{activeChar.name}</span>
             <button
@@ -443,7 +447,11 @@ export default function ChatWindow() {
               key={c.id}
               className={`chat-char-btn${c.id === activeCharacterId ? ' active' : ''}`}
               onClick={() => handleSelectChar(c.id)}
-              style={{ background: c.gradient }}
+              style={{
+                background: c.avatarDataUrl
+                  ? `url(${c.avatarDataUrl}) center/cover no-repeat`
+                  : c.gradient,
+              }}
               title={c.name}
             />
           ))}
@@ -467,7 +475,11 @@ export default function ChatWindow() {
             {messages.map((msg) => (
               <div key={msg.id} className={`chat-msg ${msg.role}`}>
                 {msg.role === 'assistant' && activeChar && (
-                  <div className="chat-msg-avatar" style={{ background: activeChar.gradient }} />
+                  <div className="chat-msg-avatar" style={{
+                    background: activeChar.avatarDataUrl
+                      ? `url(${activeChar.avatarDataUrl}) center/cover no-repeat`
+                      : activeChar.gradient,
+                  }} />
                 )}
                 {msg.role === 'error' && (
                   <div className="chat-msg-avatar chat-msg-avatar-error">!</div>

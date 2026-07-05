@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+﻿import { create } from 'zustand'
 import type { PetAction, CharacterConfig, CharactersData } from '../../common/types'
 
 interface PetState {
@@ -39,6 +39,7 @@ interface PetState {
   addCharacter: (char: CharacterConfig) => void
   removeCharacter: (id: string) => void
   setCharacterImage: (charId: string, dataUrl: string | null) => void
+  setCharacterAvatar: (charId: string, dataUrl: string | null) => void
 }
 
 export const usePetStore = create<PetState>((set, get) => ({
@@ -133,6 +134,13 @@ export const usePetStore = create<PetState>((set, get) => ({
       return { characters: next, activeCharacterId: activeId }
     }),
 
+  setCharacterAvatar: (charId, dataUrl) =>
+    set((s) => ({
+      characters: s.characters.map((c) =>
+        c.id === charId ? { ...c, avatarDataUrl: dataUrl } : c,
+      ),
+    })),
+
   setCharacterImage: (charId, dataUrl) =>
     set((s) => ({
       characters: s.characters.map((c) =>
@@ -140,3 +148,4 @@ export const usePetStore = create<PetState>((set, get) => ({
       ),
     })),
 }))
+

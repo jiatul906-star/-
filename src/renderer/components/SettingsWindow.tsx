@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+﻿import { useEffect, useState, useCallback, useMemo } from 'react'
 import type { PetAction, CharacterConfig, ApiProfile, ApiProfilesData, MemoryEntry } from '../../common/types'
 import { DEFAULT_PET_ACTIONS } from '../../common/types'
 import { usePetStore } from '../stores/pet-store'
@@ -44,6 +44,7 @@ export default function SettingsWindow() {
     updateCharacter,
     removeCharacter,
     setCharacterImage,
+    setCharacterAvatar,
   } = usePetStore()
 
   const [activeTab, setActiveTab] = useState<'look' | 'soul' | 'voice'>('look')
@@ -53,7 +54,9 @@ export default function SettingsWindow() {
   const [name, setName] = useState('')
   const [cropImageUrl, setCropImageUrl] = useState<string | null>(null)
   const [petImagePreview, setPetImagePreview] = useState<string | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [bgRemoverOpen, setBgRemoverOpen] = useState(false)
+  const [cropTarget, setCropTarget] = useState<'portrait' | 'avatar'>('portrait')
   const [personality, setPersonality] = useState('')
   const [speechStyle, setSpeechStyle] = useState('')
   const [charApiProfileId, setCharApiProfileId] = useState('')
@@ -147,6 +150,7 @@ export default function SettingsWindow() {
     if (activeChar) {
       setName(activeChar.name)
       setPetImagePreview(activeChar.imageDataUrl)
+      setAvatarPreview(activeChar.avatarDataUrl)
       setPersonality(activeChar.personality || '')
       setSpeechStyle(activeChar.speechStyle || '')
       setCharApiProfileId(activeChar.apiProfileId || '')
@@ -176,6 +180,7 @@ export default function SettingsWindow() {
       name: randomName(),
       gradient: g,
       imageDataUrl: null,
+      avatarDataUrl: null,
       personality: '',
       voiceId: '',
       speechStyle: '',
@@ -208,6 +213,7 @@ export default function SettingsWindow() {
     if (!activeChar) return
     const dataUrl = await window.electronAPI.openImageDialog(activeChar.id)
     if (dataUrl) {
+      setCropTarget('portrait')
       setCropImageUrl(dataUrl)
     }
   }, [activeChar])
@@ -215,13 +221,22 @@ export default function SettingsWindow() {
   const handleCropConfirm = useCallback((croppedDataUrl: string) => {
     if (!activeChar) return
     setCropImageUrl(null)
-    setCharacterImage(activeChar.id, croppedDataUrl)
-    setPetImagePreview(croppedDataUrl)
-    const updated = { ...activeChar, imageDataUrl: croppedDataUrl }
-    updateCharacter(updated)
-    const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
-    persist(all, activeCharacterId)
-  }, [activeChar, characters, activeCharacterId, updateCharacter, setCharacterImage, persist])
+    if (cropTarget === "avatar") {
+      setCharacterAvatar(activeChar.id, croppedDataUrl)
+      setAvatarPreview(croppedDataUrl)
+      const updated = { ...activeChar, avatarDataUrl: croppedDataUrl }
+      updateCharacter(updated)
+      const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
+      persist(all, activeCharacterId)
+    } else {
+      setCharacterImage(activeChar.id, croppedDataUrl)
+      setPetImagePreview(croppedDataUrl)
+      const updated = { ...activeChar, imageDataUrl: croppedDataUrl }
+      updateCharacter(updated)
+      const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
+      persist(all, activeCharacterId)
+    }
+  }, [activeChar, characters, activeCharacterId, cropTarget, updateCharacter, setCharacterImage, setCharacterAvatar, persist])
 
   const handleCropCancel = useCallback(() => {
     setCropImageUrl(null)
@@ -256,6 +271,36 @@ export default function SettingsWindow() {
     const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
     persist(all, activeCharacterId)
   }, [activeChar, characters, activeCharacterId, updateCharacter, setCharacterImage, persist])
+
+  const handleUploadAvatar = useCallback(async () => {
+    if (!activeChar) return
+    const dataUrl = await window.electronAPI.openImageDialog(activeChar.id)
+    if (dataUrl) {
+      setCropTarget("avatar")
+      setCropImageUrl(dataUrl)
+    }
+  }, [activeChar])
+
+  const handleCropAvatarConfirm = useCallback((croppedDataUrl: string) => {
+    if (!activeChar) return
+    setCropImageUrl(null)
+    setCharacterAvatar(activeChar.id, croppedDataUrl)
+    setAvatarPreview(croppedDataUrl)
+    const updated = { ...activeChar, avatarDataUrl: croppedDataUrl }
+    updateCharacter(updated)
+    const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
+    persist(all, activeCharacterId)
+  }, [activeChar, characters, activeCharacterId, updateCharacter, setCharacterAvatar, persist])
+
+  const handleClearAvatar = useCallback(() => {
+    if (!activeChar) return
+    setCharacterAvatar(activeChar.id, null)
+    setAvatarPreview(null)
+    const updated = { ...activeChar, avatarDataUrl: null }
+    updateCharacter(updated)
+    const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
+    persist(all, activeCharacterId)
+  }, [activeChar, characters, activeCharacterId, updateCharacter, setCharacterAvatar, persist])
 
   // ===== API Profile 操作 =====
   const persistProfiles = useCallback(
@@ -433,7 +478,7 @@ export default function SettingsWindow() {
               className={`char-item${c.id === activeCharacterId ? ' active' : ''}`}
               onClick={() => handleSelectChar(c.id)}
             >
-              <div className="dot" style={{ background: c.gradient }} />
+              <div className="dot" style={{ background: c.avatarDataUrl ? `url(${c.avatarDataUrl}) center/cover no-repeat` : c.gradient }} />
               <span className="char-item-name">{c.name}</span>
               {characters.length > 1 && c.id === activeCharacterId && (
                 <button
@@ -471,20 +516,6 @@ export default function SettingsWindow() {
 
         {/* 右侧内容 */}
         <div className="settings-content">
-          {bgRemoverOpen && petImagePreview && (
-            <BackgroundRemover
-              imageUrl={petImagePreview}
-              onConfirm={handleBgRemoveConfirm}
-              onCancel={() => setBgRemoverOpen(false)}
-            />
-          )}
-          {cropImageUrl && (
-            <ImageCropper
-              imageUrl={cropImageUrl}
-              onCrop={handleCropConfirm}
-              onCancel={handleCropCancel}
-            />
-          )}
           {nav === 'appearance' && activeChar && (
             <>
               <h3>编辑角色 · {activeChar.name}</h3>
@@ -513,21 +544,67 @@ export default function SettingsWindow() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>角色头像 / 立绘</label>
+                    <label>角色立绘</label>
                     {petImagePreview ? (
                       <div className="pet-image-preview-area">
-                        <img className="pet-image-preview" src={petImagePreview} alt="桌宠形象预览" />
+                        <img className="pet-image-preview" src={petImagePreview} alt="角色立绘预览" />
                         <div className="pet-image-actions">
                           <button className="pet-image-change-btn" onClick={handleUploadImage}>更换图片</button>
                           <button className="pet-image-reset-btn" onClick={() => setBgRemoverOpen(true)}>移除背景</button>
-                          <button className="pet-image-reset-btn" onClick={handleClearImage}>使用默认形象</button>
+                          <button className="pet-image-reset-btn" onClick={handleClearImage}>使用默认</button>
                         </div>
                       </div>
                     ) : (
-                      <button className="avatar-upload-btn" onClick={handleUploadImage}>点击上传</button>
+                      <button className="avatar-upload-btn" onClick={handleUploadImage}>点击上传立绘</button>
                     )}
-                    <div className="hint">支持 JPG/PNG/GIF，建议 1:1 比例</div>
+                    <div className="hint">用于桌宠形象显示，建议 1:1 比例</div>
                   </div>
+                  <div className="form-group">
+                    <label>角色头像</label>
+                    {avatarPreview ? (
+                      <div className="pet-image-preview-area">
+                        <div className="avatar-preview-circle">
+                          <img className="avatar-preview-img" src={avatarPreview} alt="角色头像预览" />
+                        </div>
+                        <div className="pet-image-actions">
+                          <button className="pet-image-change-btn" onClick={handleUploadAvatar}>更换头像</button>
+                          <button className="pet-image-reset-btn" onClick={handleClearAvatar}>清除头像</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button className="avatar-upload-btn" onClick={handleUploadAvatar}>点击上传头像</button>
+                    )}
+                    <div className="hint">用于侧边栏和标题栏，建议正方形图片</div>
+                  </div>
+                  <div className="char-preview-card">
+                    <div className="char-preview-header">
+                      <div
+                        className="char-preview-avatar"
+                        style={{
+                          background: avatarPreview
+                            ? `url("${avatarPreview}") center/cover no-repeat`
+                            : activeChar.gradient,
+                        }}
+                      />
+                      <div className="char-preview-info">
+                        <span className="char-preview-name">{name || activeChar.name}</span>
+                      </div>
+                    </div>
+                  </div>
+                {bgRemoverOpen && petImagePreview && (
+                  <BackgroundRemover
+                    imageUrl={petImagePreview}
+                    onConfirm={handleBgRemoveConfirm}
+                    onCancel={() => setBgRemoverOpen(false)}
+                  />
+                )}
+                {cropImageUrl && (
+                  <ImageCropper
+                    imageUrl={cropImageUrl}
+                    onCrop={handleCropConfirm}
+                    onCancel={handleCropCancel}
+                  />
+                )}
                 </>
               )}
 
@@ -843,3 +920,12 @@ export default function SettingsWindow() {
     </div>
   )
 }
+
+
+
+
+
+
+
+
+

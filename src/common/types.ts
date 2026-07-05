@@ -1,10 +1,11 @@
-// 公共类型，主进程和渲染进程共享
+﻿// 公共类型，主进程和渲染进程共享
 
 export interface CharacterConfig {
   id: string
   name: string
   gradient: string        // CSS gradient 色值，用于 CSS 身体 + 侧边栏圆点
   imageDataUrl: string | null // base64 自定义形象，null = 使用 CSS 默认形象
+  avatarDataUrl: string | null // base64 角色头像（圆形裁切），null = 使用 CSS 渐变默认
   personality: string
   voiceId: string
   speechStyle: string
@@ -22,6 +23,7 @@ export const DEFAULT_CHARACTERS: CharacterConfig[] = [
     name: '小桃',
     gradient: 'linear-gradient(175deg, #FDD9C4 0%, #F2B8A0 40%, #E8A38B 100%)',
     imageDataUrl: null,
+    avatarDataUrl: null,
     personality: '',
     voiceId: '',
     speechStyle: '',
@@ -31,6 +33,7 @@ export const DEFAULT_CHARACTERS: CharacterConfig[] = [
     name: '小蓝',
     gradient: 'linear-gradient(175deg, #C8DCF5 0%, #B0C8E8 40%, #A8C8E8 100%)',
     imageDataUrl: null,
+    avatarDataUrl: null,
     personality: '',
     voiceId: '',
     speechStyle: '',
