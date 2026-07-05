@@ -1,5 +1,5 @@
-appId: com.ai-companion.app
-productName: AI伴侣
+appId: com.with-u.app
+productName: WITH U
 directories:
   output: dist
 files:
@@ -17,5 +17,5 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: AI 伴侣
-  artifactName: AI伴侣 Setup ${version}.${ext}
+  shortcutName: WITH U
+  artifactName: WITH U Setup ${version}.${ext}

@@ -895,7 +895,7 @@ export default function SettingsWindow() {
 
           {nav === 'about' && (
             <div className="about-section">
-              <h3>关于 AI 伴侣</h3>
+              <h3>关于 WITH U</h3>
               <p className="subtitle">桌面宠物 + AI 聊天伴侣</p>
               <p><strong>版本：</strong>0.1.0</p>
               <p><strong>技术栈：</strong>Electron + React + TypeScript</p>

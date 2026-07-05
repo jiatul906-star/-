@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage } from 'electron'
+﻿import { app, BrowserWindow, Tray, Menu, nativeImage } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { createChatWindow } from './windows/chat'
@@ -46,7 +46,7 @@ function createTray(): Tray {
   )
 
   const trayInstance = new Tray(icon)
-  trayInstance.setToolTip('AI 伴侣')
+  trayInstance.setToolTip('WITH U')
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -111,6 +111,19 @@ function bootstrap() {
   })
 }
 
+// 单实例锁：禁止多开
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (chatWindow && !chatWindow.isDestroyed()) {
+      chatWindow.show()
+      chatWindow.focus()
+    }
+  })
+}
+
 app.whenReady().then(bootstrap)
 
 app.on('window-all-closed', () => {
@@ -124,3 +137,4 @@ app.on('activate', () => {
 app.on('before-quit', () => {
   // 允许正常退出
 })
+

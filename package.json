@@ -1,8 +1,8 @@
 {
-  "name": "ai-companion",
+  "name": "with-u",
   "version": "0.1.0",
-  "description": "AI 聊天伴侣桌面工具",
-  "author": "AI Companion Team",
+  "description": "WITH U 桌面应用",
+  "author": "WITH U Team",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
