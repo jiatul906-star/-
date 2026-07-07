@@ -21,10 +21,11 @@ export default function ChatWindow() {
   const {
     characters,
     activeCharacterId,
+    characterAvatars,
     setCharactersData,
     setActiveCharacterId,
-    setCharacterImage,
-    updateCharacter,
+    setCharacterAvatar,
+    loadAllCharacterAvatars,
   } = usePetStore()
 
   const activeChar = useMemo(
@@ -62,11 +63,18 @@ export default function ChatWindow() {
 
   // 初始化：加载角色 + API Profiles + 聊天历史 + 记忆
   useEffect(() => {
-    window.electronAPI.getCharacters().then(setCharactersData)
+    window.electronAPI.getCharacters().then((data) => {
+      setCharactersData(data)
+      loadAllCharacterAvatars(data.characters)
+    })
 
-    const unsubChars = window.electronAPI.onCharactersUpdated(setCharactersData)
-    const unsubImage = window.electronAPI.onPetImageUpdated(({ charId, dataUrl }) => {
-      setCharacterImage(charId, dataUrl)
+    const unsubChars = window.electronAPI.onCharactersUpdated((data) => {
+      setCharactersData(data)
+      loadAllCharacterAvatars(data.characters)
+    })
+    const unsubImage = window.electronAPI.onPetImageUpdated(({ charId, imageType, dataUrl }) => {
+      if (imageType === 'portrait') return // ChatWindow 只关心 avatar
+      setCharacterAvatar(charId, dataUrl)
     })
 
     // 加载 API Profiles
@@ -104,7 +112,7 @@ export default function ChatWindow() {
       unsubProfiles()
       unsubHistory()
     }
-  }, [setCharactersData, setCharacterImage])
+  }, [setCharactersData, setCharacterAvatar, loadAllCharacterAvatars])
 
   // 切换角色时加载历史 + 记忆
   useEffect(() => {
@@ -210,7 +218,7 @@ export default function ChatWindow() {
         : extractedTrait
       const updated = { ...activeChar, personality: newPersonality }
       updateCharacter(updated)
-      const allChars = characters.map((c) => (c.id === activeChar.id ? updated : c))
+      const allChars = usePetStore.getState().characters.map((c) => (c.id === activeChar.id ? updated : c))
       window.electronAPI.saveCharacters({ characters: allChars, activeId: activeCharacterId }).catch(() => {})
     }
 
@@ -375,8 +383,8 @@ export default function ChatWindow() {
             <div
               className="chat-titlebar-avatar"
               style={{
-                background: activeChar.avatarDataUrl
-                  ? `url(${activeChar.avatarDataUrl}) center/cover no-repeat`
+                background: characterAvatars[activeChar.id]
+                  ? `url(${characterAvatars[activeChar.id]}) center/cover no-repeat`
                   : activeChar.gradient,
               }}
             />
@@ -448,8 +456,8 @@ export default function ChatWindow() {
               className={`chat-char-btn${c.id === activeCharacterId ? ' active' : ''}`}
               onClick={() => handleSelectChar(c.id)}
               style={{
-                background: c.avatarDataUrl
-                  ? `url(${c.avatarDataUrl}) center/cover no-repeat`
+                background: characterAvatars[c.id]
+                  ? `url(${characterAvatars[c.id]}) center/cover no-repeat`
                   : c.gradient,
               }}
               title={c.name}

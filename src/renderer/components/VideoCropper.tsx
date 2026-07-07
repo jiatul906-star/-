@@ -99,11 +99,11 @@ export default function VideoCropper({ videoPath, currentCropX, currentCropY, cu
           拖拽选择要显示的画面区域（百分比），完成后点击确认
         </p>
 
-        <div ref={containerRef} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: '#000', maxHeight: 300 }}>
+        <div ref={containerRef} style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', background: '#000', maxHeight: 520 }}>
           <video
             ref={videoRef}
             src={src}
-            style={{ width: '100%', display: 'block', maxHeight: 300 }}
+            style={{ width: '100%', display: 'block', maxHeight: 520 }}
             onLoadedMetadata={onMeta}
             onError={() => setErr(true)}
             autoPlay muted loop

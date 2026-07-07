@@ -1,4 +1,4 @@
-﻿import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import type { PetAction, CharactersData, ApiProfilesData, ApiProfile, ChatMessage, MemoryEntry } from '../common/types'
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -17,20 +17,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 动作持久化
   getPetActions: (): Promise<PetAction[]> => ipcRenderer.invoke('pet-actions:getAll'),
- savePetActions: (actions: PetAction[]): Promise<void> =>
-   ipcRenderer.invoke('pet-actions:save', actions),
+  savePetActions: (actions: PetAction[]): Promise<void> =>
+    ipcRenderer.invoke('pet-actions:save', actions),
   onPetActionsUpdated: (callback: (actions: PetAction[]) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, actions: PetAction[]) => callback(actions)
     ipcRenderer.on('pet-actions:updated', listener)
     return () => ipcRenderer.removeListener('pet-actions:updated', listener)
   },
 
- // 打开窗口
+  // 打开窗口
   openChat: () => ipcRenderer.invoke('window:openChat'),
   openSettings: () => ipcRenderer.invoke('window:openSettings'),
 
   // 文件对话框
-  openVideoDialog: (): Promise<string | null> => ipcRenderer.invoke('dialog:openVideo'),
+  openVideoDialog: (charName: string): Promise<string | null> =>
+    ipcRenderer.invoke('dialog:openVideo', charName),
+  openIdleVideosFolder: (): Promise<void> => ipcRenderer.invoke('dialog:openIdleVideosFolder'),
+
+  // 视频路径解析
+  getVideoPath: (charName: string, videoFileName: string): Promise<string | null> =>
+    ipcRenderer.invoke('character:getVideoPath', charName, videoFileName),
+
+  // 打开角色视频文件夹
+  openCharacterVideoFolder: (charName: string): Promise<void> =>
+    ipcRenderer.invoke('dialog:openCharacterVideoFolder', charName),
+
+  // 列出角色视频文件夹中的文件
+  listIdleVideos: (charName: string): Promise<string[]> =>
+    ipcRenderer.invoke('character:listVideos', charName),
 
   // 角色持久化
   getCharacters: (): Promise<CharactersData> => ipcRenderer.invoke('character:getAll'),
@@ -41,19 +55,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('characters:updated', listener)
   },
 
-  // 桌宠形象图片（按角色ID）
-  openImageDialog: (charId: string): Promise<string | null> =>
-    ipcRenderer.invoke('dialog:openImage', charId),
-  getPetImage: (charId: string): Promise<string | null> =>
-    ipcRenderer.invoke('pet-image:getCurrent', charId),
-  onPetImageUpdated: (callback: (payload: { charId: string; dataUrl: string | null }) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, payload: { charId: string; dataUrl: string | null }) =>
+  // 桌宠形象图片（按角色名 + 图片类型）
+  openImageDialog: (charName: string, imageType: string): Promise<string | null> =>
+    ipcRenderer.invoke('dialog:openImage', charName, imageType),
+  getPetImage: (charName: string, imageType: string): Promise<string | null> =>
+    ipcRenderer.invoke('pet-image:getCurrent', charName, imageType),
+  onPetImageUpdated: (callback: (payload: { charId: string; charName: string; imageType: string; dataUrl: string | null }) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: { charId: string; charName: string; imageType: string; dataUrl: string | null }) =>
       callback(payload)
     ipcRenderer.on('pet-image:updated', listener)
     return () => ipcRenderer.removeListener('pet-image:updated', listener)
   },
 
-  // 窗口失去焦点（主进程已缩窗，渲染进程只需关菜单状态）
+  // 窗口失去焦点
   onPetMenuClose: (callback: () => void): (() => void) => {
     const listener = () => callback()
     ipcRenderer.on('pet:menuClose', listener)
@@ -90,12 +104,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('agent-memory:add', characterId, entry),
   deleteAgentMemory: (characterId: string, id: string): Promise<void> =>
     ipcRenderer.invoke('agent-memory:delete', characterId, id),
- updateAgentMemory: (characterId: string, id: string, content: string): Promise<void> =>
-   ipcRenderer.invoke('agent-memory:update', characterId, id, content),
+  updateAgentMemory: (characterId: string, id: string, content: string): Promise<void> =>
+    ipcRenderer.invoke('agent-memory:update', characterId, id, content),
   // Agent Memory Import / Export
   exportAgentMemory: (characterId: string, charName: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('agent-memory:export', characterId, charName),
   importAgentMemory: (characterId: string): Promise<{ success: boolean; entries?: MemoryEntry[]; error?: string; reason?: string }> =>
     ipcRenderer.invoke('agent-memory:import', characterId),
 })
-

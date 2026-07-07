@@ -1084,3 +1084,33 @@
 .theme-toggle-btn.dark .theme-toggle-thumb {
   transform: translateX(22px);
 }
+
+
+/* ===== 外观提示 ===== */
+.look-hint-inline {
+  font-size: 9px;
+  color: var(--text-secondary);
+  margin-left: 28px;
+  font-weight: normal;
+}
+
+.idle-action-btn-below {
+  display: inline-block;
+  padding: 6px 14px;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 100ms;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.idle-action-btn-below:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--bg-warm);
+}

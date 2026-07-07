@@ -6,11 +6,12 @@ import VideoChromaPicker from './VideoChromaPicker'
 interface Props {
   actions: PetAction[]
   onSave: (actions: PetAction[]) => void
+  charName?: string
 }
 
 let nextId = 100
 
-export default function ActionEditor({ actions, onSave }: Props) {
+export default function ActionEditor({ actions, onSave, charName }: Props) {
   const [list, setList] = useState<PetAction[]>(() =>
     [...actions].sort((a, b) => a.order - b.order),
   )
@@ -18,6 +19,7 @@ export default function ActionEditor({ actions, onSave }: Props) {
   const [addMode, setAddMode] = useState(false)
   const [cropperVideoPath, setCropperVideoPath] = useState<string | null>(null)
   const [chromaPickerOpen, setChromaPickerOpen] = useState(false)
+  const [chromaVideoPath, setChromaVideoPath] = useState<string | null>(null)
 
   // 编辑中的表单
   const [form, setForm] = useState<PetAction>({
@@ -106,8 +108,31 @@ export default function ActionEditor({ actions, onSave }: Props) {
     setForm((f) => ({ ...f, cropX: undefined, cropY: undefined, cropW: undefined, cropH: undefined }))
   }
 
+  // 将文件名解析为完整路径（供 VideoCropper/VideoChromaPicker 使用）
+  const resolveVideoPath = async (fileName: string): Promise<string | null> => {
+    if (!fileName) return null
+    return await window.electronAPI.getVideoPath(charName || '', fileName)
+  }
+
+  const handleOpenCropper = async () => {
+    if (!form.videoPath) return
+    const fullPath = await resolveVideoPath(form.videoPath)
+    if (fullPath) {
+      setCropperVideoPath(fullPath)
+    }
+  }
+
+  const handleOpenChromaPicker = async () => {
+    if (!form.videoPath) return
+    const fullPath = await resolveVideoPath(form.videoPath)
+    if (fullPath) {
+      setChromaVideoPath(fullPath)
+      setChromaPickerOpen(true)
+    }
+  }
+
   const handleBrowseVideo = async () => {
-    const selectedPath = await window.electronAPI.openVideoDialog()
+    const selectedPath = await window.electronAPI.openVideoDialog(charName || '')
     if (selectedPath) {
       setForm((f) => ({ ...f, videoPath: selectedPath }))
     }
@@ -172,7 +197,7 @@ export default function ActionEditor({ actions, onSave }: Props) {
                 <input value={form.emoji} onChange={(e) => setForm((f) => ({ ...f, emoji: e.target.value }))} style={inputStyle} placeholder="图标" maxLength={4} title="emoji 图标" />
                 <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} style={{ ...inputStyle, width: 70 }} placeholder="名称" />
                 <input value={form.videoPath} onChange={(e) => setForm((f) => ({ ...f, videoPath: e.target.value }))} style={{ ...inputStyle, width: 130 }} placeholder="视频路径" readOnly title={form.videoPath} />
-                <button onClick={() => setCropperVideoPath(form.videoPath)} disabled={!form.videoPath} style={btnStyle(!form.videoPath)} title={form.videoPath ? '裁切画面' : '请先选择视频'}>✂</button>
+                <button onClick={() => handleOpenCropper()} disabled={!form.videoPath} style={btnStyle(!form.videoPath)} title={form.videoPath ? '裁切画面' : '请先选择视频'}>✂</button>
                 {(form.cropX != null || form.cropY != null || form.cropW != null || form.cropH != null) && (
                   <button onClick={handleClearCrop} style={{ ...btnStyle(false), color: '#E8927C' }} title="清除裁切">↺</button>
                 )}
@@ -182,7 +207,7 @@ export default function ActionEditor({ actions, onSave }: Props) {
 
                 {/* 色度键去底 */}
                 {form.videoPath && (
-                  <button onClick={() => setChromaPickerOpen(true)} style={{
+                  <button onClick={handleOpenChromaPicker} style={{
                     width: '100%', padding: '10px', borderRadius: 8, border: '1px solid #ddd',
                     background: form.chromaKey ? '#FFE8E0' : '#F5F3F1', cursor: 'pointer',
                     fontFamily: 'inherit', fontSize: 14, fontWeight: 500, marginTop: 4,
@@ -193,17 +218,18 @@ export default function ActionEditor({ actions, onSave }: Props) {
                 )}
 
                 {/* 视频去底弹窗 */}
-                {chromaPickerOpen && form.videoPath && (
+                {chromaPickerOpen && chromaVideoPath && (
                   <div className="crop-overlay" style={{ marginTop: 4 }}>
                     <VideoChromaPicker
-                      videoPath={form.videoPath}
+                      videoPath={chromaVideoPath}
                       currentChromaKey={form.chromaKey}
                       currentTolerance={form.chromaKeyTolerance}
                       onConfirm={(color, tolerance) => {
                         setForm((f) => ({ ...f, chromaKey: color, chromaKeyTolerance: tolerance }))
                         setChromaPickerOpen(false)
+                        setChromaVideoPath(null)
                       }}
-                      onCancel={() => setChromaPickerOpen(false)}
+                      onCancel={() => { setChromaPickerOpen(false); setChromaVideoPath(null) }}
                     />
                   </div>
                 )}
@@ -240,7 +266,7 @@ export default function ActionEditor({ actions, onSave }: Props) {
             <input value={form.emoji} onChange={(e) => setForm((f) => ({ ...f, emoji: e.target.value }))} style={inputStyle} placeholder="图标" maxLength={4} />
             <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} style={{ ...inputStyle, width: 80 }} placeholder="名称" />
             <input value={form.videoPath} onChange={(e) => setForm((f) => ({ ...f, videoPath: e.target.value }))} style={{ ...inputStyle, width: 160 }} placeholder="视频路径（留空 = emoji 反馈）" readOnly title={form.videoPath} />
-            <button onClick={() => setCropperVideoPath(form.videoPath)} disabled={!form.videoPath} style={btnStyle(!form.videoPath)} title="裁切画面">✂</button>
+            <button onClick={() => handleOpenCropper()} disabled={!form.videoPath} style={btnStyle(!form.videoPath)} title="裁切画面">✂</button>
             <button onClick={handleBrowseVideo} style={btnStyle(false)}>📁</button>
             <button onClick={saveEdit} style={{ ...btnStyle(false), color: '#7DB8A8', fontWeight: 600 }}>✓ 添加</button>
             <button onClick={cancelEdit} style={btnStyle(false)}>取消</button>

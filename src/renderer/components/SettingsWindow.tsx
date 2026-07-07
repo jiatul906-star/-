@@ -38,13 +38,16 @@ export default function SettingsWindow() {
   const {
     characters,
     activeCharacterId,
+    characterPortraits,
+    characterAvatars,
     setCharactersData,
     setActiveCharacterId,
     addCharacter,
     updateCharacter,
     removeCharacter,
-    setCharacterImage,
+    setCharacterPortrait,
     setCharacterAvatar,
+    loadCharacterImages,
   } = usePetStore()
 
   const [activeTab, setActiveTab] = useState<'look' | 'soul' | 'voice'>('look')
@@ -109,21 +112,35 @@ export default function SettingsWindow() {
 
   // 初始化：加载角色 + 动作
   useEffect(() => {
-    window.electronAPI.getCharacters().then(setCharactersData)
+    window.electronAPI.getCharacters().then((data) => {
+      setCharactersData(data)
+      for (const c of data.characters) {
+        loadCharacterImages(c.id, c.name)
+      }
+    })
     window.electronAPI.getPetActions().then((list) => {
       setActions(list.length > 0 ? list : DEFAULT_PET_ACTIONS)
     })
 
-    const unsubChars = window.electronAPI.onCharactersUpdated(setCharactersData)
-    const unsubImage = window.electronAPI.onPetImageUpdated(({ charId, dataUrl }) => {
-      setCharacterImage(charId, dataUrl)
+    const unsubChars = window.electronAPI.onCharactersUpdated((data) => {
+      setCharactersData(data)
+      for (const c of data.characters) {
+        loadCharacterImages(c.id, c.name)
+      }
+    })
+    const unsubImage = window.electronAPI.onPetImageUpdated(({ charId, imageType, dataUrl }) => {
+      if (imageType === 'portrait') {
+        setCharacterPortrait(charId, dataUrl)
+      } else if (imageType === 'avatar') {
+        setCharacterAvatar(charId, dataUrl)
+      }
     })
 
     return () => {
       unsubChars()
       unsubImage()
     }
-  }, [setCharactersData, setCharacterImage])
+  }, [setCharactersData, setCharacterPortrait, setCharacterAvatar, loadCharacterImages])
 
   // 初始化：加载 API Profiles
   useEffect(() => {
@@ -149,13 +166,13 @@ export default function SettingsWindow() {
   useEffect(() => {
     if (activeChar) {
       setName(activeChar.name)
-      setPetImagePreview(activeChar.imageDataUrl)
-      setAvatarPreview(activeChar.avatarDataUrl)
+      setPetImagePreview(characterPortraits[activeChar.id] ?? null)
+      setAvatarPreview(characterAvatars[activeChar.id] ?? null)
       setPersonality(activeChar.personality || '')
       setSpeechStyle(activeChar.speechStyle || '')
       setCharApiProfileId(activeChar.apiProfileId || '')
     }
-  }, [activeChar?.id])
+  }, [activeChar?.id, characterPortraits, characterAvatars])
 
   // ===== 保存到磁盘 =====
   const persist = useCallback(
@@ -179,8 +196,6 @@ export default function SettingsWindow() {
       id: generateId(),
       name: randomName(),
       gradient: g,
-      imageDataUrl: null,
-      avatarDataUrl: null,
       personality: '',
       voiceId: '',
       speechStyle: '',
@@ -211,7 +226,7 @@ export default function SettingsWindow() {
 
   const handleUploadImage = useCallback(async () => {
     if (!activeChar) return
-    const dataUrl = await window.electronAPI.openImageDialog(activeChar.id)
+    const dataUrl = await window.electronAPI.openImageDialog(activeChar.name, 'portrait')
     if (dataUrl) {
       setCropTarget('portrait')
       setCropImageUrl(dataUrl)
@@ -224,19 +239,12 @@ export default function SettingsWindow() {
     if (cropTarget === "avatar") {
       setCharacterAvatar(activeChar.id, croppedDataUrl)
       setAvatarPreview(croppedDataUrl)
-      const updated = { ...activeChar, avatarDataUrl: croppedDataUrl }
-      updateCharacter(updated)
-      const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
-      persist(all, activeCharacterId)
     } else {
-      setCharacterImage(activeChar.id, croppedDataUrl)
+      setCharacterPortrait(activeChar.id, croppedDataUrl)
       setPetImagePreview(croppedDataUrl)
-      const updated = { ...activeChar, imageDataUrl: croppedDataUrl }
-      updateCharacter(updated)
-      const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
-      persist(all, activeCharacterId)
     }
-  }, [activeChar, characters, activeCharacterId, cropTarget, updateCharacter, setCharacterImage, setCharacterAvatar, persist])
+    // persist 只写 config（不含图片），图片文件已在 openImageDialog 时写入磁盘
+  }, [activeChar, cropTarget, setCharacterPortrait, setCharacterAvatar])
 
   const handleCropCancel = useCallback(() => {
     setCropImageUrl(null)
@@ -245,13 +253,9 @@ export default function SettingsWindow() {
   const handleBgRemoveConfirm = useCallback((resultDataUrl: string) => {
     if (!activeChar) return
     setBgRemoverOpen(false)
-    setCharacterImage(activeChar.id, resultDataUrl)
+    setCharacterPortrait(activeChar.id, resultDataUrl)
     setPetImagePreview(resultDataUrl)
-    const updated = { ...activeChar, imageDataUrl: resultDataUrl }
-    updateCharacter(updated)
-    const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
-    persist(all, activeCharacterId)
-  }, [activeChar, characters, activeCharacterId, updateCharacter, setCharacterImage, persist])
+  }, [activeChar, setCharacterPortrait])
 
   const toggleTheme = useCallback(() => {
     setThemeMode((prev) => {
@@ -264,43 +268,24 @@ export default function SettingsWindow() {
 
   const handleClearImage = useCallback(() => {
     if (!activeChar) return
-    setCharacterImage(activeChar.id, null)
+    setCharacterPortrait(activeChar.id, null)
     setPetImagePreview(null)
-    const updated = { ...activeChar, imageDataUrl: null }
-    updateCharacter(updated)
-    const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
-    persist(all, activeCharacterId)
-  }, [activeChar, characters, activeCharacterId, updateCharacter, setCharacterImage, persist])
+  }, [activeChar, setCharacterPortrait])
 
   const handleUploadAvatar = useCallback(async () => {
     if (!activeChar) return
-    const dataUrl = await window.electronAPI.openImageDialog(activeChar.id)
+    const dataUrl = await window.electronAPI.openImageDialog(activeChar.name, 'avatar')
     if (dataUrl) {
       setCropTarget("avatar")
       setCropImageUrl(dataUrl)
     }
   }, [activeChar])
 
-  const handleCropAvatarConfirm = useCallback((croppedDataUrl: string) => {
-    if (!activeChar) return
-    setCropImageUrl(null)
-    setCharacterAvatar(activeChar.id, croppedDataUrl)
-    setAvatarPreview(croppedDataUrl)
-    const updated = { ...activeChar, avatarDataUrl: croppedDataUrl }
-    updateCharacter(updated)
-    const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
-    persist(all, activeCharacterId)
-  }, [activeChar, characters, activeCharacterId, updateCharacter, setCharacterAvatar, persist])
-
   const handleClearAvatar = useCallback(() => {
     if (!activeChar) return
     setCharacterAvatar(activeChar.id, null)
     setAvatarPreview(null)
-    const updated = { ...activeChar, avatarDataUrl: null }
-    updateCharacter(updated)
-    const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
-    persist(all, activeCharacterId)
-  }, [activeChar, characters, activeCharacterId, updateCharacter, setCharacterAvatar, persist])
+  }, [activeChar, setCharacterAvatar])
 
   // ===== API Profile 操作 =====
   const persistProfiles = useCallback(
@@ -478,7 +463,7 @@ export default function SettingsWindow() {
               className={`char-item${c.id === activeCharacterId ? ' active' : ''}`}
               onClick={() => handleSelectChar(c.id)}
             >
-              <div className="dot" style={{ background: c.avatarDataUrl ? `url(${c.avatarDataUrl}) center/cover no-repeat` : c.gradient }} />
+              <div className="dot" style={{ background: characterAvatars[c.id] ? `url(${characterAvatars[c.id]}) center/cover no-repeat` : c.gradient }} />
               <span className="char-item-name">{c.name}</span>
               {characters.length > 1 && c.id === activeCharacterId && (
                 <button
@@ -544,7 +529,7 @@ export default function SettingsWindow() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>角色立绘</label>
+                    <label>角色立绘 <span className="look-hint-inline">点击按钮后的窗口在下方</span></label>
                     {petImagePreview ? (
                       <div className="pet-image-preview-area">
                         <img className="pet-image-preview" src={petImagePreview} alt="角色立绘预览" />
@@ -785,7 +770,8 @@ export default function SettingsWindow() {
               <h3>动作按钮配置</h3>
               <p className="subtitle">自定义右键菜单的动作按钮</p>
               {saved && <span className="save-toast">✓ 已保存</span>}
-              <ActionEditor actions={actions} onSave={handleSaveActions} />
+              <button className="idle-action-btn-below" onClick={() => window.electronAPI.openIdleVideosFolder()}>待机动作列表</button>
+              <ActionEditor actions={actions} onSave={handleSaveActions} charName={activeChar?.name} />
             </>
           )}
 

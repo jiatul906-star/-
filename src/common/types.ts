@@ -4,8 +4,6 @@ export interface CharacterConfig {
   id: string
   name: string
   gradient: string        // CSS gradient 色值，用于 CSS 身体 + 侧边栏圆点
-  imageDataUrl: string | null // base64 自定义形象，null = 使用 CSS 默认形象
-  avatarDataUrl: string | null // base64 角色头像（圆形裁切），null = 使用 CSS 渐变默认
   personality: string
   voiceId: string
   speechStyle: string
@@ -17,13 +15,22 @@ export interface CharactersData {
   activeId: string
 }
 
+// 角色文件夹索引
+export interface CharacterIndexEntry {
+  id: string
+  folderName: string
+}
+
+export interface CharacterIndex {
+  activeId: string
+  entries: Record<string, CharacterIndexEntry> // keyed by character ID
+}
+
 export const DEFAULT_CHARACTERS: CharacterConfig[] = [
   {
     id: 'char_1',
     name: '小桃',
     gradient: 'linear-gradient(175deg, #FDD9C4 0%, #F2B8A0 40%, #E8A38B 100%)',
-    imageDataUrl: null,
-    avatarDataUrl: null,
     personality: '',
     voiceId: '',
     speechStyle: '',
@@ -32,8 +39,6 @@ export const DEFAULT_CHARACTERS: CharacterConfig[] = [
     id: 'char_2',
     name: '小蓝',
     gradient: 'linear-gradient(175deg, #C8DCF5 0%, #B0C8E8 40%, #A8C8E8 100%)',
-    imageDataUrl: null,
-    avatarDataUrl: null,
     personality: '',
     voiceId: '',
     speechStyle: '',
@@ -132,7 +137,7 @@ export interface PetAction {
   id: string
   label: string
   emoji: string
-  videoPath: string // 空字符串表示未配置视频
+  videoPath: string // 纯文件名（如 "pat_head.mp4"），空字符串表示未配置视频。运行时按角色文件夹解析完整路径
   order: number
   type: 'normal' | 'chat' | 'settings'
   trimStart?: number       // 视频裁切起始时间（秒），可选

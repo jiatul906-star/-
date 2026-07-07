@@ -114,7 +114,7 @@ export default function VideoChromaPicker({ videoPath, currentChromaKey, current
         <p style={{ fontSize: 12, color: '#999', margin: '0 0 10px' }}>播放 → 📸 取帧 → 点击画面取色 → 调整容差 → 预览效果 → 应用</p>
 
         <div style={{ borderRadius: 10, overflow: 'hidden', background: '#000', marginBottom: 8 }}>
-          <video ref={videoRef} src={src} style={{ width: '100%', display: 'block', maxHeight: 180 }} autoPlay muted loop controls />
+          <video ref={videoRef} src={src} style={{ width: '100%', display: 'block', maxHeight: 360 }} autoPlay muted loop controls />
         </div>
 
         <div style={{ textAlign: 'center', marginBottom: 10 }}>

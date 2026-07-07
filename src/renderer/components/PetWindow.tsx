@@ -9,6 +9,11 @@ import './context-menu.css'
 
 const DRAG_THRESHOLD = 4
 
+// 空闲视频间隔（毫秒）
+const IDLE_MIN_INTERVAL = 5000   // 最短 5 秒
+const IDLE_MAX_INTERVAL = 10000  // 最长 10 秒
+const IDLE_FIRST_DELAY = 3000    // 首次播放延迟 3 秒
+
 export default function PetWindow() {
   const characterRef = useRef<HTMLDivElement>(null)
   const {
@@ -22,15 +27,21 @@ export default function PetWindow() {
     feedbackLabel,
     characters,
     activeCharacterId,
+    characterPortraits,
+    idleVideos,
+    isIdlePlaying,
     setActions,
     setCharactersData,
     setActiveCharacterId,
-    setCharacterImage,
+    setCharacterPortrait,
+    loadCharacterImages,
     openMenu,
     closeMenu: closeMenuStore,
     triggerAction,
     clearVideo,
     currentActionMeta,
+    setIdleVideos,
+    setIdlePlaying,
   } = usePetStore()
 
   const activeChar = useMemo(
@@ -60,6 +71,20 @@ export default function PetWindow() {
     lastScreenY: 0,
   })
 
+  // ===== 空闲定时器 refs =====
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const idleGuardRef = useRef({
+    videoVisible: false,
+    menuVisible: false,
+    dragging: false,
+    isChatStreaming: false,
+  })
+  // 保持 guard ref 同步
+  idleGuardRef.current.videoVisible = videoVisible
+  idleGuardRef.current.menuVisible = menuVisible
+  idleGuardRef.current.dragging = dragging
+  idleGuardRef.current.isChatStreaming = isChatStreaming
+
   // ---- 背景 + pointer-events ----
   useEffect(() => {
     document.documentElement.style.background = 'transparent'
@@ -77,14 +102,28 @@ export default function PetWindow() {
   // ---- 初始化 ----
  useEffect(() => {
    window.electronAPI.getPetActions().then(setActions)
-   window.electronAPI.getCharacters().then((data) => setCharactersData(data))
-   const unsubChars = window.electronAPI.onCharactersUpdated((data) => setCharactersData(data))
+   window.electronAPI.getCharacters().then((data) => {
+     setCharactersData(data)
+     for (const c of data.characters) {
+       loadCharacterImages(c.id, c.name)
+     }
+   })
+   const unsubChars = window.electronAPI.onCharactersUpdated((data) => {
+     setCharactersData(data)
+     for (const c of data.characters) {
+       loadCharacterImages(c.id, c.name)
+     }
+   })
     const unsubActions = window.electronAPI.onPetActionsUpdated((updated) => setActions(updated))
-   const unsubImage = window.electronAPI.onPetImageUpdated(({ charId, dataUrl }) =>
-     setCharacterImage(charId, dataUrl),
-   )
+   const unsubImage = window.electronAPI.onPetImageUpdated(({ charId, imageType, dataUrl }) => {
+     if (imageType === 'portrait') {
+       setCharacterPortrait(charId, dataUrl)
+     } else if (imageType === 'avatar') {
+       usePetStore.getState().setCharacterAvatar(charId, dataUrl)
+     }
+   })
     return () => { unsubChars(); unsubActions(); unsubImage() }
-  }, [setActions, setCharactersData, setCharacterImage])
+  }, [setActions, setCharactersData, setCharacterPortrait, loadCharacterImages])
 
   // ---- 网络状态监听 ----
   useEffect(() => {
@@ -117,6 +156,95 @@ export default function PetWindow() {
     }
   }, [activeChar?.id])
 
+  // ---- 角色切换时加载空闲视频列表 ----
+  useEffect(() => {
+    if (activeChar) {
+      window.electronAPI.listIdleVideos(activeChar.name).then((videos) => {
+        setIdleVideos(videos)
+      })
+    } else {
+      setIdleVideos([])
+    }
+  }, [activeChar?.name, setIdleVideos])
+
+  // ---- 空闲视频自动播放 ----
+  const scheduleIdleVideo = useCallback(() => {
+    // 清除旧定时器
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current)
+      idleTimerRef.current = null
+    }
+
+    const delay = IDLE_MIN_INTERVAL + Math.random() * (IDLE_MAX_INTERVAL - IDLE_MIN_INTERVAL)
+
+    idleTimerRef.current = setTimeout(async () => {
+      const g = idleGuardRef.current
+      const store = usePetStore.getState()
+
+      // 防护检查
+      if (g.videoVisible || g.menuVisible || g.dragging || g.isChatStreaming) {
+        scheduleIdleVideo() // 推迟到下一轮
+        return
+      }
+
+      const videos = store.idleVideos
+      if (!videos || videos.length === 0) {
+        scheduleIdleVideo()
+        return
+      }
+
+      const char = store.characters.find(c => c.id === store.activeCharacterId)
+      if (!char) {
+        scheduleIdleVideo()
+        return
+      }
+
+      // 随机选一个视频
+      const idx = Math.floor(Math.random() * videos.length)
+      const fileName = videos[idx]
+      const fullPath = await window.electronAPI.getVideoPath(char.name, fileName)
+
+      if (fullPath) {
+        usePetStore.setState({
+          currentVideo: `file:///${fullPath.replace(/\\/g, '/')}`,
+          videoVisible: true,
+          isIdlePlaying: true,
+          currentActionMeta: null,
+        })
+      } else {
+        scheduleIdleVideo()
+      }
+    }, delay)
+  }, [])
+
+  // 首次启动 + idleVideos 变化时开始调度
+  useEffect(() => {
+    // 先首次延迟启动
+    const firstTimer = setTimeout(() => {
+      scheduleIdleVideo()
+    }, IDLE_FIRST_DELAY)
+
+    return () => {
+      clearTimeout(firstTimer)
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+    }
+  }, [idleVideos, scheduleIdleVideo])
+
+  // ---- 视频播放完毕后恢复空闲调度 ----
+  const handleVideoEnded = useCallback(() => {
+    clearVideo()
+    usePetStore.setState({ isIdlePlaying: false })
+    // 调度下一轮
+    scheduleIdleVideo()
+  }, [clearVideo, scheduleIdleVideo])
+
+  const handleVideoError = useCallback(() => {
+    clearVideo()
+    usePetStore.setState({ isIdlePlaying: false, feedbackEmoji: '❌', feedbackLabel: '视频加载失败' })
+    setTimeout(() => usePetStore.setState({ feedbackEmoji: null, feedbackLabel: null }), 2000)
+    scheduleIdleVideo()
+  }, [clearVideo, scheduleIdleVideo])
+
   // ---- 窗口失去焦点：主进程已缩窗，只需关闭菜单状态 ----
   useEffect(() => {
     const unsub = window.electronAPI.onPetMenuClose(() => {
@@ -135,8 +263,6 @@ export default function PetWindow() {
       const charRect = char.getBoundingClientRect()
       const scrCX = charRect.left + charRect.width / 2
       const scrCY = charRect.top + charRect.height / 2
-      // 先扩窗（传角色屏幕坐标以保持位置），再打开菜单
-      // expanded: char centered (320/2=160), top=45, height/2=90 → center=(160,135)
       window.electronAPI.resizePet(true, scrCX, scrCY).then(() => {
         openMenu(160, 135)
       })
@@ -219,8 +345,15 @@ export default function PetWindow() {
   }, [])
 
   const onClick = useCallback(() => {
-    if (videoVisible) clearVideo()
-  }, [videoVisible, clearVideo])
+    if (videoVisible) {
+      // 空闲视频：点击停止并跳过；动作视频同理
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+      clearVideo()
+      usePetStore.setState({ isIdlePlaying: false })
+      // 重新调度
+      scheduleIdleVideo()
+    }
+  }, [videoVisible, clearVideo, scheduleIdleVideo])
 
   const handleSendChat = useCallback(
    async (text: string) => {
@@ -228,7 +361,6 @@ export default function PetWindow() {
 
       if (!activeChar) return
       const now = Date.now()
-      // 保存到聊天历史
       window.electronAPI.addChatMessage(activeChar.id, {
         id: 'popup_' + now,
         role: 'user',
@@ -237,7 +369,6 @@ export default function PetWindow() {
         characterId: activeChar.id,
       }).catch(() => {})
 
-      // 检查 API 配置
       const profile = activeChar.apiProfileId
         ? apiProfiles.find((p) => p.id === activeChar.apiProfileId) || activeProfile
         : activeProfile
@@ -273,7 +404,6 @@ export default function PetWindow() {
           })
         }
         } catch (err: any) {
-          // 保存 AI 回复到聊天历史
           if (activeChar && fullContent) {
             window.electronAPI.addChatMessage(activeChar.id, {
               id: 'popup_ai_' + now,
@@ -300,7 +430,6 @@ export default function PetWindow() {
     [activeChar, activeProfile, apiProfiles, memories],
   )
 
-  // 关闭菜单时停止流式输出 + 清空聊天状态
   const handleCloseMenu = useCallback(() => {
     chatAbortRef.current?.abort()
     setChatMessages([])
@@ -314,7 +443,7 @@ export default function PetWindow() {
     setIsChatStreaming(false)
   }, [])
 
-  const showCustomImage = !!activeChar?.imageDataUrl
+  const showCustomImage = !!(activeChar && characterPortraits[activeChar.id])
 
   return (
     <div className={`pet-window${menuVisible ? ' menu-open' : ''}`} onMouseDown={onMouseDownDead}>
@@ -327,7 +456,7 @@ export default function PetWindow() {
         onClick={onClick}
       >
         {showCustomImage && !videoVisible && (
-          <img className="pet-image" src={activeChar!.imageDataUrl!} alt={activeChar!.name} />
+          <img className="pet-image" src={characterPortraits[activeChar!.id]!} alt={activeChar!.name} />
         )}
         {!showCustomImage && !videoVisible && activeChar && (
          <div className="pet-body" style={{ background: activeChar.gradient }}>
@@ -355,22 +484,14 @@ export default function PetWindow() {
               cropY={currentActionMeta?.cropY}
               cropW={currentActionMeta?.cropW}
               cropH={currentActionMeta?.cropH}
-              onEnded={clearVideo}
-              onError={() => {
-                clearVideo()
-                usePetStore.setState({ feedbackEmoji: '❌', feedbackLabel: '视频加载失败' })
-                setTimeout(() => usePetStore.setState({ feedbackEmoji: null, feedbackLabel: null }), 2000)
-              }}
+              onEnded={handleVideoEnded}
+              onError={handleVideoError}
               className="pet-video"
             />
           ) : (
             <video className="pet-video" src={currentVideo} autoPlay
-              onEnded={clearVideo}
-              onError={() => {
-                clearVideo()
-                usePetStore.setState({ feedbackEmoji: '❌', feedbackLabel: '视频加载失败' })
-                setTimeout(() => usePetStore.setState({ feedbackEmoji: null, feedbackLabel: null }), 2000)
-              }}
+              onEnded={handleVideoEnded}
+              onError={handleVideoError}
             />
           )
         )}
