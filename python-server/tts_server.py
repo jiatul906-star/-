@@ -118,3 +118,7 @@ if __name__ == "__main__":
     print(f"[tts_server] 启动 http://{args.host}:{args.port}", flush=True)
 
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+else:
+    # 作为模块导入时（uvicorn 直接加载），提供 app 实例即可
+    # uvicorn python-server.tts_server:app --port 9876
+    pass
