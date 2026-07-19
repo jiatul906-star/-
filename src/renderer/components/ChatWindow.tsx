@@ -234,6 +234,21 @@ export default function ChatWindow() {
       onError: (msg) => console.warn('[TTS]', msg),
     })
   }, [setTtsPlayState, setTtsCurrentSentence])
+  // 同步主题模式：监听跨窗口的 storage 事件
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'theme-mode') {
+        const isNowDark = e.newValue === 'dark'
+        setIsDark(isNowDark)
+        if (e.newValue) {
+          document.documentElement.setAttribute('data-theme', e.newValue)
+        }
+      }
+    }
+    window.addEventListener('storage', handleStorage)
+    return () => window.removeEventListener('storage', handleStorage)
+  }, [])
+
 
   // ===== 发送消息 =====
   const sendMessage = useCallback(async (overrideText?: string) => {

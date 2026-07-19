@@ -552,6 +552,18 @@ export default function SettingsWindow() {
       window.electronAPI.getAgentMemory(activeChar.id).then(setMemories)
     }
   }, [activeChar?.id])
+  // ????????????? storage ??
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'theme-mode' && (e.newValue === 'light' || e.newValue === 'dark')) {
+        setThemeMode(e.newValue)
+        document.documentElement.setAttribute('data-theme', e.newValue)
+      }
+    }
+    window.addEventListener('storage', handleStorage)
+    return () => window.removeEventListener('storage', handleStorage)
+  }, [])
+
 
   // 切换角色时更新表单
   useEffect(() => {
