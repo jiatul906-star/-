@@ -76,9 +76,10 @@ export default function PetWindow() {
     lastScreenY: 0,
   })
 
-  // ===== 空闲定时器 refs =====
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const idleGuardRef = useRef({
+ // ===== 空闲定时器 refs =====
+ const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const videoEndedCleanlyRef = useRef(false)
+ const idleGuardRef = useRef({
     videoVisible: false,
     menuVisible: false,
     dragging: false,
@@ -235,20 +236,26 @@ export default function PetWindow() {
     }
   }, [idleVideos, scheduleIdleVideo])
 
-  // ---- 视频播放完毕后恢复空闲调度 ----
-  const handleVideoEnded = useCallback(() => {
-    clearVideo()
-    usePetStore.setState({ isIdlePlaying: false })
-    // 调度下一轮
-    scheduleIdleVideo()
-  }, [clearVideo, scheduleIdleVideo])
+ // ---- 视频播放完毕后恢复空闲调度 ----
+ const handleVideoEnded = useCallback(() => {
+    videoEndedCleanlyRef.current = true
+   clearVideo()
+   usePetStore.setState({ isIdlePlaying: false })
+   // 调度下一轮
+   scheduleIdleVideo()
+ }, [clearVideo, scheduleIdleVideo])
 
-  const handleVideoError = useCallback(() => {
-    clearVideo()
-    usePetStore.setState({ isIdlePlaying: false, feedbackEmoji: '❌', feedbackLabel: '视频加载失败' })
-    setTimeout(() => usePetStore.setState({ feedbackEmoji: null, feedbackLabel: null }), 2000)
-    scheduleIdleVideo()
-  }, [clearVideo, scheduleIdleVideo])
+ const handleVideoError = useCallback(() => {
+    // 如果视频刚刚正常播完，可能触发了清理过程中的假性 error 事件
+    if (videoEndedCleanlyRef.current) {
+      videoEndedCleanlyRef.current = false
+      return
+    }
+   clearVideo()
+   usePetStore.setState({ isIdlePlaying: false, feedbackEmoji: '❌', feedbackLabel: '视频加载失败' })
+   setTimeout(() => usePetStore.setState({ feedbackEmoji: null, feedbackLabel: null }), 2000)
+   scheduleIdleVideo()
+ }, [clearVideo, scheduleIdleVideo])
 
   // ---- 窗口失去焦点：主进程已缩窗，只需关闭菜单状态 ----
   useEffect(() => {

@@ -41,6 +41,12 @@ export default function ChromaKeyVideo({
   const keyColorRef = useRef<[number, number, number]>([0, 255, 0])
   const hasChroma = typeof chromaKey === 'string' && chromaKey.length > 0
   const hasCrop = cropX != null || cropY != null || cropW != null || cropH != null
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   useEffect(() => {
     if (hasChroma) {
@@ -128,16 +134,18 @@ export default function ChromaKeyVideo({
       if (trimEnd != null && video.currentTime >= trimEnd) { video.pause(); onEnded() }
     }
 
-    const onVideoEnd = () => onEnded()
+  const onVideoEnd = () => onEnded()
+    const onVideoError = () => { if (mountedRef.current) onError() }
     video.addEventListener('loadedmetadata', onLoad)
     video.addEventListener('timeupdate', onTimeUpdate)
     video.addEventListener('ended', onVideoEnd)
-    video.addEventListener('error', () => onError())
+    video.addEventListener('error', onVideoError)
 
     return () => {
       video.removeEventListener('loadedmetadata', onLoad)
       video.removeEventListener('timeupdate', onTimeUpdate)
       video.removeEventListener('ended', onVideoEnd)
+      video.removeEventListener('error', onVideoError)
       cancelAnimationFrame(animRef.current)
       video.pause()
       video.src = ''
