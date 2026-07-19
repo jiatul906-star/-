@@ -447,31 +447,26 @@ function patchIndexttsForWetext(pythonPath: string): void {
       return
     }
 
-    // 替换 load() 方法中的平台判断
-    const oldLoad = `    def load(self):
-        # print(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-        # sys.path.append(model_dir)
-        import platform
-        if self.zh_normalizer is not None and self.en_normalizer is not None:
-            return
-        if platform.system() == "Darwin":
-            from wetext import Normalizer
+    // Replace the entire load() method with the patched version
+    // The original code has a Darwin check — we remove the OS check entirely
+    // and always use wetext (which works on all platforms)
 
-            self.zh_normalizer = Normalizer(remove_erhua=False, lang="zh", operator="tn")
-            self.en_normalizer = Normalizer(lang="en", operator="tn")
-        else:
-            from tn.chinese.normalizer import Normalizer as NormalizerZh
-            from tn.english.normalizer import Normalizer as NormalizerEn
-            # use new cache dir for build tagger rules with disable remove_interjections and remove_erhua
-            cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tagger_cache")
-            if not os.path.exists(cache_dir):
-                os.makedirs(cache_dir)
-                with open(os.path.join(cache_dir, ".gitignore"), "w") as f:
-                    f.write("*\n")
-            self.zh_normalizer = NormalizerZh(
-                cache_dir=cache_dir, remove_interjections=False, remove_erhua=False, overwrite_cache=False
-            )
-            self.en_normalizer = NormalizerEn(overwrite_cache=False)`
+    // Find the start and end of the load() method
+    const loadStart = content.search(/def load\(self\):\s*?\n/)
+    if (loadStart === -1) {
+      console.warn('[python-env-manager] load() not found in front.py')
+      return
+    }
+
+    // Find the normalize() method that follows load() to know where load() ends
+    const normalizeStart = content.search(/def normalize\(self/)
+    if (normalizeStart === -1 || normalizeStart <= loadStart) {
+      console.warn('[python-env-manager] normalize() bounds not found')
+      return
+    }
+
+    const before = content.slice(0, loadStart)
+    const after = content.slice(normalizeStart)
 
     const newLoad = `    def load(self):
         if self.zh_normalizer is not None and self.en_normalizer is not None:
@@ -479,9 +474,11 @@ function patchIndexttsForWetext(pythonPath: string): void {
         # Use wetext on all platforms (pynini-free; previously Darwin-only)
         from wetext import Normalizer
         self.zh_normalizer = Normalizer(remove_erhua=False, lang="zh", operator="tn")
-        self.en_normalizer = Normalizer(lang="en", operator="tn")`
+        self.en_normalizer = Normalizer(lang="en", operator="tn")
 
-    const newContent = content.replace(oldLoad, newLoad)
+`
+
+    const newContent = before + newLoad + after
 
     // Also patch setup.py to remove WeTextProcessing from install_requires
     // (already handled by using wetext in requirements.txt, but double-check)
