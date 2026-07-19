@@ -120,12 +120,20 @@ function TtsPythonEnv() {
 
   // 准备中 / 安装中
   if (installing && pipProgress) {
+    const stageLabel: Record<string, string> = {
+      preparing: '准备安装...',
+      installing: '安装基础依赖...',
+      installing_indextts: '安装 index-tts...',
+      downloading_indextts: '下载 index-tts 源码...',
+      done: '完成！',
+      error: '安装失败',
+    }
     return (
       <div className="tts-status-banner tts-status-checking">
         <div className="tts-download-label">
-          📦 {pipProgress.stage === 'preparing' ? '准备安装...' : `安装 Python 依赖... ${pipProgress.percent}%`}
+          📦 {stageLabel[pipProgress.stage] || pipProgress.stage} {pipProgress.percent}%
         </div>
-        {pipProgress.stage === 'installing' && (
+        {(pipProgress.stage !== 'error' && pipProgress.stage !== 'done') && (
           <div className="tts-download-bar-track" style={{ marginTop: 4 }}>
             <div
               className="tts-download-bar-fill"

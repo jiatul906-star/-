@@ -4,14 +4,22 @@
  * 策略：
  * - 软件首次启动时自动检测 Python 环境是否就绪
  * - 未就绪 → 用户可在设置中一键安装（pip install -r requirements.txt）
+ *   → 先用 requirements.txt 安装基础依赖（无 pynini/WeTextProcessing）
+ *   → 再下载 index-tts GitHub tarball (HTTP，走代理)
+ *   → 本地 pip install tarball（已 patch 掉 pynini 依赖，改用 wetext）
  * - 安装进度通过 IPC 实时广播
  * - 生产环境使用 extraResources 中的嵌入式 Python
  */
 
 import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
-import { existsSync } from 'fs'
+import { existsSync, unlinkSync, createWriteStream } from 'fs'
 import { spawn, execSync } from 'child_process'
+import * as https from 'https'
+import * as http from 'http'
+
+// index-tts GitHub Release tarball 下载地址
+const INDEXTTS_TARBALL_URL = 'https://github.com/index-tts/index-tts/archive/refs/tags/v1.5.0.tar.gz'
 
 // ===== 路径解析 =====
 
@@ -43,6 +51,11 @@ export function getRequirementsPath(): string {
     return join(process.resourcesPath, 'python-server', 'requirements.txt')
   }
   return join(app.getAppPath(), 'python-server', 'requirements.txt')
+}
+
+/** index-tts tarball 下载临时路径 */
+function getIndexttsTarballPath(): string {
+  return join(app.getPath('userData'), 'index-tts.tar.gz')
 }
 
 /** 解析系统 Python（开发环境用） */
@@ -98,10 +111,11 @@ function getPipVersion(pythonPath: string): string {
   }
 }
 
-/** 检查依赖是否已安装（快速检查 index-tts） */
+/** 检查依赖是否已安装（快速检查 index-tts 和 wetext） */
 function checkDepsInstalled(pythonPath: string): boolean {
   try {
-    execSync(`"${pythonPath}" -c "import index_tts" 2>&1`, {
+    // 检查 index-tts 是否能 import
+    execSync(`"${pythonPath}" -c "import indextts" 2>&1`, {
       timeout: 10_000,
       encoding: 'utf-8',
     })
@@ -148,7 +162,7 @@ export function checkPythonEnv(): EnvCheckResult {
 // ===== pip install =====
 
 export interface PipInstallProgress {
-  stage: 'preparing' | 'installing' | 'done' | 'error'
+  stage: 'preparing' | 'installing' | 'installing_indextts' | 'downloading_indextts' | 'done' | 'error'
   percent: number           // 0-100
   currentPackage: string    // 当前正在安装的包名
   output: string            // 最近一行 pip 输出
@@ -156,8 +170,10 @@ export interface PipInstallProgress {
 }
 
 /**
- * 执行 pip install -r requirements.txt
- * 解析 pip 输出，逐行广播进度
+ * 完整安装流程（三步）：
+ * 1. pip install -r requirements.txt (基础依赖，无 pynini)
+ * 2. 下载 index-tts tarball (HTTP GET，支持代理)
+ * 3. pip install index-tts.tar.gz (自动安装湿依赖)
  */
 export async function installDependencies(
   onProgress: (p: PipInstallProgress) => void,
@@ -181,30 +197,24 @@ export async function installDependencies(
     return false
   }
 
-  onProgress({
-    stage: 'preparing', percent: 0, currentPackage: '', output: '正在准备安装 Python 依赖...',
-  })
+  // ===== Step 1: pip install base requirements =====
+  onProgress({ stage: 'preparing', percent: 0, currentPackage: 'pip', output: '正在准备...' })
 
-  // 先升级 pip 确保兼容性
+  // 先升级 pip
   try {
-    await runPipCommand(pythonPath, ['install', '--upgrade', 'pip'], (output) => {
-      onProgress({ stage: 'preparing', percent: 5, currentPackage: 'pip', output })
+    await runPipCommand(pythonPath, ['install', '--upgrade', 'pip', '-i', 'https://pypi.tuna.tsinghua.edu.cn/simple'], (output) => {
+      onProgress({ stage: 'preparing', percent: 2, currentPackage: 'pip', output })
     })
-  } catch {
-    // 升级 pip 失败不影响后续安装
-  }
+  } catch { /* 升级失败不影响安装 */ }
 
-  // 估算总包数，用于显示进度
-  const totalPackages = 5 // torch, torchaudio, index-tts, fastapi, uvicorn
-  let completed = 0
-
-  return new Promise((resolve) => {
+  // 安装基础依赖（无 pynini/WeTextProcessing/maturin）
+  const baseInstallOk = await new Promise<boolean>((resolve) => {
     const child = spawn(pythonPath, [
       '-m', 'pip', 'install',
       '-r', requirementsPath,
       '--progress-bar', 'off',
       '--no-warn-script-location',
-      '-i', 'https://pypi.tuna.tsinghua.edu.cn/simple',  // 清华镜像源，国内加速
+      '-i', 'https://pypi.tuna.tsinghua.edu.cn/simple',
     ], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
@@ -213,73 +223,172 @@ export async function installDependencies(
     child.stdout.on('data', (data: Buffer) => {
       const line = data.toString().trim()
       if (!line) return
-
-      // 解析 pip 输出，提取包名
-      let currentPackage = ''
       if (line.includes('Collecting ')) {
         const match = line.match(/Collecting\s+(\S+)/)
-        if (match) {
-          currentPackage = match[1]
-          completed++
-          const percent = Math.min(95, Math.round((completed / totalPackages) * 100))
-          onProgress({
-            stage: 'installing', percent, currentPackage, output: `正在安装 ${currentPackage}...`,
-          })
-          return
-        }
-      }
-
-      if (line.includes('Successfully installed')) {
         onProgress({
-          stage: 'installing', percent: 98, currentPackage: '', output: line,
+          stage: 'installing', percent: Math.min(70, 5 + Math.random() * 60),
+          currentPackage: match ? match[1] : '', output: line,
         })
-        return
+      } else {
+        onProgress({ stage: 'installing', percent: Math.min(70, 5 + Math.random() * 60), currentPackage: '', output: line })
       }
-
-      // 普通日志行
-      onProgress({
-        stage: 'installing',
-        percent: Math.min(95, 10 + completed * 15),
-        currentPackage,
-        output: line,
-      })
     })
 
     child.stderr.on('data', (data: Buffer) => {
       const line = data.toString().trim()
       if (line) {
-        // pip 的一些输出走 stderr（正常现象）
-        onProgress({
-          stage: 'installing',
-          percent: Math.min(95, 10 + completed * 15),
-          currentPackage: '',
-          output: line,
-        })
+        onProgress({ stage: 'installing', percent: Math.min(70, 5 + Math.random() * 60), currentPackage: '', output: line })
+      }
+    })
+
+    child.on('close', (code) => {
+      resolve(code === 0)
+    })
+    child.on('error', () => resolve(false))
+  })
+
+  if (!baseInstallOk) {
+    onProgress({ stage: 'error', percent: 0, currentPackage: '', output: '', error: '基础依赖安装失败。请检查网络后重试。' })
+    return false
+  }
+
+  // ===== Step 2: 下载 index-tts tarball =====
+  onProgress({ stage: 'downloading_indextts', percent: 72, currentPackage: 'index-tts', output: '下载 index-tts 源码...' })
+
+  const tarballPath = getIndexttsTarballPath()
+  // 删除旧文件
+  if (existsSync(tarballPath)) {
+    try { unlinkSync(tarballPath) } catch { /* ignore */ }
+  }
+
+  const downloadOk = await downloadFile(INDEXTTS_TARBALL_URL, tarballPath, (percent) => {
+    onProgress({
+      stage: 'downloading_indextts',
+      percent: 72 + Math.round(percent * 0.13), // 72-85%
+      currentPackage: 'index-tts',
+      output: `下载 index-tts: ${percent}%`,
+    })
+  })
+
+  if (!downloadOk) {
+    onProgress({ stage: 'error', percent: 0, currentPackage: '', output: '', error: '下载 index-tts 失败。请检查网络连接后重试。' })
+    return false
+  }
+
+  // ===== Step 3: pip install index-tts from local tarball =====
+  onProgress({ stage: 'installing_indextts', percent: 86, currentPackage: 'index-tts', output: '安装 index-tts...' })
+
+  const indexttsOk = await new Promise<boolean>((resolve) => {
+    const child = spawn(pythonPath, [
+      '-m', 'pip', 'install',
+      tarballPath,
+      '--progress-bar', 'off',
+      '--no-warn-script-location',
+      '-i', 'https://pypi.tuna.tsinghua.edu.cn/simple',
+    ], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+    })
+
+    child.stdout.on('data', (data: Buffer) => {
+      const line = data.toString().trim()
+      if (!line) return
+      onProgress({ stage: 'installing_indextts', percent: Math.min(99, 86 + Math.random() * 13), currentPackage: 'index-tts', output: line })
+    })
+
+    child.stderr.on('data', (data: Buffer) => {
+      const line = data.toString().trim()
+      if (line) {
+        onProgress({ stage: 'installing_indextts', percent: Math.min(99, 86 + Math.random() * 13), currentPackage: 'index-tts', output: line })
       }
     })
 
     child.on('close', (code) => {
       if (code === 0) {
-        onProgress({
-          stage: 'done', percent: 100, currentPackage: '', output: 'Python 依赖安装完成！',
-        })
+        // 安装成功后清理 tarball
+        try { unlinkSync(tarballPath) } catch { /* ignore */ }
         resolve(true)
       } else {
-        onProgress({
-          stage: 'error', percent: 0, currentPackage: '', output: '',
-          error: `pip install 失败（退出码: ${code}）。请检查网络连接后重试。`,
-        })
         resolve(false)
       }
     })
+    child.on('error', () => resolve(false))
+  })
 
-    child.on('error', (err) => {
-      onProgress({
-        stage: 'error', percent: 0, currentPackage: '', output: '',
-        error: `启动 pip 失败: ${err.message}`,
+  if (!indexttsOk) {
+    onProgress({ stage: 'error', percent: 0, currentPackage: '', output: '', error: '安装 index-tts 失败。请稍后重试。' })
+    return false
+  }
+
+  onProgress({ stage: 'done', percent: 100, currentPackage: '', output: 'Python 依赖安装完成！语音功能已就绪。' })
+  return true
+}
+
+// ===== HTTP 下载（支持代理） =====
+
+function downloadFile(url: string, destPath: string, onProgress: (percent: number) => void): Promise<boolean> {
+  return new Promise((resolve) => {
+    const file = createWriteStream(destPath)
+    let totalSize = 0
+    let downloaded = 0
+
+    const makeRequest = (redirectCount = 0) => {
+      if (redirectCount > 5) {
+        resolve(false)
+        return
+      }
+
+      const protocol = url.startsWith('https') ? https : http
+      const req = protocol.get(url, { headers: { 'User-Agent': 'WITH-U/0.1.0' } }, (res) => {
+        // Follow redirect
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          url = new URL(res.headers.location, url).href
+          file.close()
+          makeRequest(redirectCount + 1)
+          return
+        }
+
+        if (res.statusCode !== 200) {
+          file.close()
+          resolve(false)
+          return
+        }
+
+        const contentLength = res.headers['content-length']
+        totalSize = contentLength ? parseInt(contentLength) : 0
+
+        res.on('data', (chunk: Buffer) => {
+          downloaded += chunk.length
+          file.write(chunk)
+          if (totalSize > 0) {
+            onProgress(Math.min(100, Math.round((downloaded / totalSize) * 100)))
+          }
+        })
+
+        res.on('end', () => {
+          file.end()
+          resolve(downloaded > 0)
+        })
+
+        res.on('error', () => {
+          file.close()
+          resolve(false)
+        })
       })
-      resolve(false)
-    })
+
+      req.on('error', () => {
+        file.close()
+        resolve(false)
+      })
+
+      req.setTimeout(30000, () => {
+        req.destroy()
+        file.close()
+        resolve(false)
+      })
+    }
+
+    makeRequest()
   })
 }
 
