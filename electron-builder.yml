@@ -14,6 +14,10 @@ extraResources:
     to: python-server/
     filter:
       - '**/*'
+  - from: resources/default-characters/
+    to: default-characters/
+    filter:
+      - '**/*'
 win:
   icon: resources/icon.ico
   sign: false
@@ -28,3 +32,4 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: WITH U
   artifactName: WITH U Setup ${version}.${ext}
+  include: installer.nsh

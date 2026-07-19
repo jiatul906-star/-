@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, app, dialog, shell } from 'electron'
+﻿import { ipcMain, BrowserWindow, app, dialog, shell } from 'electron'
 import { copyFileSync, existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, readdirSync, statSync, unlinkSync, rmdirSync } from 'fs'
 import { join } from 'path'
 import { getPythonManager } from '../python-manager'
@@ -486,11 +486,57 @@ function loadCharactersData(): CharactersData {
 
 // ===== 注册 IPC =====
 
+// 递归复制目录
+function copyDirRecursive(src: string, dest: string): void {
+  ensureDir(dest)
+  const items = readdirSync(src)
+  for (const item of items) {
+    const s = join(src, item)
+    const d = join(dest, item)
+    if (statSync(s).isDirectory()) {
+      copyDirRecursive(s, d)
+    } else {
+      copyFileSync(s, d)
+    }
+  }
+}
+
+// 首次启动时从捆绑资源导入默认角色
+function ensureDefaultCharacters(): void {
+  try {
+    const userCharDir = characterBase
+    // 检查用户数据目录是否为空（仅含 _index.json 或无文件）
+    const existingFiles = existsSync(userCharDir) ? readdirSync(userCharDir).filter(f => f !== '_index.json') : []
+    if (existingFiles.length === 0) {
+      const bundledPath = join(process.resourcesPath, 'default-characters')
+      if (!existsSync(bundledPath)) return
+      ensureDir(userCharDir)
+      // 复制整个 default-characters 目录到 userData/character
+      const items = readdirSync(bundledPath)
+      for (const item of items) {
+        const src = join(bundledPath, item)
+        const dest = join(userCharDir, item)
+        const stat = statSync(src)
+        if (stat.isDirectory()) {
+          copyDirRecursive(src, dest)
+        } else {
+          copyFileSync(src, dest)
+        }
+      }
+      console.log('[DefaultCharacters] 已从捆绑资源导入默认角色')
+    }
+  } catch (err) {
+    console.error('[DefaultCharacters] 导入失败:', err)
+  }
+}
+
+
 export function registerIpc(deps: IpcDeps) {
   const { loadPetActions, savePetActions, getPetWindow, getChatWindow, getOrCreateChatWindow, getOrCreateSettingsWindow, getAllWindows } = deps
 
-  // 启动时确保目录结构
+  // 启动时确保目录结构并导入默认角色
   ensureCharacterStructure()
+  ensureDefaultCharacters()
 
   // ===== window controls =====
   ipcMain.handle('window:minimize', (event) => {
@@ -512,6 +558,11 @@ export function registerIpc(deps: IpcDeps) {
 
   ipcMain.handle('app:quit', () => {
     app.exit(0)
+  })
+
+  // 数据目录路径
+  ipcMain.handle('app:getDataPath', () => {
+    return app.getPath('userData')
   })
 
   // ===== pet mouse passthrough =====
@@ -696,7 +747,23 @@ export function registerIpc(deps: IpcDeps) {
         folderName = candidate
       }
 
-      saveCharacterConfig(folderName, char)
+      // 提取并保存 portrait.png
+      if ((char as any).imageDataUrl) {
+        try {
+          const buf = dataUrlToBuffer((char as any).imageDataUrl)
+          if (buf) writeFileSync(join(charDir(folderName), 'portrait.png'), buf)
+        } catch {}
+      }
+      // 提取并保存 avatar.png
+      if ((char as any).avatarDataUrl) {
+        try {
+          const buf = dataUrlToBuffer((char as any).avatarDataUrl)
+          if (buf) writeFileSync(join(charDir(folderName), 'avatar.png'), buf)
+        } catch {}
+      }
+      // 写 config.json（不含图片字段）
+      const { imageDataUrl, avatarDataUrl, ...cleanConfig } = char as any
+      saveCharacterConfig(folderName, cleanConfig)
       newEntries[char.id] = { id: char.id, folderName }
     }
 

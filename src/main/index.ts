@@ -1,4 +1,4 @@
-﻿import { app, BrowserWindow, Tray, Menu, nativeImage } from 'electron'
+import { app, BrowserWindow, Tray, Menu, nativeImage } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { createChatWindow } from './windows/chat'
@@ -37,6 +37,39 @@ function savePetActions(actions: PetAction[]): void {
     writeFileSync(petActionsFile, JSON.stringify({ actions }, null, 2), 'utf-8')
   } catch {
     // 静默失败
+  }
+}
+
+/** 版本变更检测：版本变化时清除 API Key（隐私保护），保留角色数据 */
+function clearApiKeysOnVersionChange(): void {
+  const versionFile = join(userDataPath, '.version')
+  const apiProfilesFile = join(userDataPath, 'api-profiles.json')
+
+  try {
+    let prevVersion = ''
+    if (existsSync(versionFile)) {
+      prevVersion = readFileSync(versionFile, 'utf-8').trim()
+    }
+
+    const currentVersion = app.getVersion()
+    if (prevVersion === currentVersion) return
+
+    // 版本变化（全新安装或升级）→ 清除 API Key
+    if (existsSync(apiProfilesFile)) {
+      const raw = readFileSync(apiProfilesFile, 'utf-8')
+      const data = JSON.parse(raw)
+      if (data.profiles && Array.isArray(data.profiles)) {
+        for (const profile of data.profiles) {
+          profile.apiKey = ''
+        }
+        writeFileSync(apiProfilesFile, JSON.stringify(data, null, 2), 'utf-8')
+        console.log('[VersionCheck] API keys cleared (' + (prevVersion || 'fresh') + ' → ' + currentVersion + ')')
+      }
+    }
+
+    writeFileSync(versionFile, currentVersion, 'utf-8')
+  } catch (err: any) {
+    console.warn('[VersionCheck] Failed:', err.message)
   }
 }
 
@@ -88,6 +121,7 @@ function getOrCreateSettingsWindow(): BrowserWindow {
 }
 
 function bootstrap() {
+  clearApiKeysOnVersionChange()
   chatWindow = createChatWindow()
   chatWindow.on('closed', () => { chatWindow = null })
   petWindow = createPetWindow()

@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { usePetStore } from '../stores/pet-store'
 import { streamChat, buildSystemPrompt } from '../plugins/chat/api'
@@ -475,6 +475,8 @@ export default function ChatWindow() {
   const handleSelectChar = useCallback(
     (id: string) => {
       setActiveCharacterId(id)
+      const { characters } = usePetStore.getState()
+      window.electronAPI.saveCharacters({ characters, activeId: id })
     },
     [setActiveCharacterId],
   )

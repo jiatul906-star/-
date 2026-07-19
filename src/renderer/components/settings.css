@@ -748,6 +748,78 @@
   margin: 0;
 }
 
+.system-prompt-preview textarea {
+  font-family: "Cascadia Code", "Fira Code", "Consolas", "Microsoft YaHei", monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #555;
+  white-space: pre-wrap;
+  word-break: break-word;
+  width: 100%;
+  min-height: 180px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  resize: vertical;
+  background: transparent;
+}
+
+/* ===== System Prompt 编辑工具栏 ===== */
+.system-prompt-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #E0DDD8;
+}
+.system-prompt-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #666;
+  line-height: 1;
+}
+.system-prompt-lock-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #DDD;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  transition: background 100ms ease-out, border-color 100ms ease-out;
+  color: #888;
+}
+.system-prompt-lock-btn:hover {
+  background: #F0EDE8;
+  border-color: #CCC;
+}
+.system-prompt-lock-btn:active {
+  background: #E5E0D8;
+}
+
+/* 锁定状态下 textarea 折叠 */
+.system-prompt-preview.locked {
+  overflow: hidden;
+}
+.system-prompt-preview.locked .system-prompt-textarea {
+  max-height: 54px;
+  min-height: 54px;
+  overflow: hidden;
+  cursor: default;
+  resize: none;
+  opacity: 0.65;
+}
+.system-prompt-preview .system-prompt-textarea {
+  transition: max-height 300ms ease-in-out, min-height 300ms ease-in-out, opacity 200ms ease;
+}
+
 .system-prompt-empty {
   font-size: 12px;
   color: #BBB;
@@ -946,6 +1018,11 @@
 [data-theme="dark"] .save-toast { background: #2A2625; color: #7DB8A8; }
 [data-theme="dark"] .system-prompt-preview { background: var(--bg-card); border-color: var(--border-light); }
 [data-theme="dark"] .system-prompt-preview pre { color: var(--text-primary); }
+[data-theme="dark"] .system-prompt-preview textarea { color: var(--text-primary); }
+[data-theme="dark"] .system-prompt-toolbar { border-bottom-color: var(--border-light); }
+[data-theme="dark"] .system-prompt-label { color: var(--text-secondary); }
+[data-theme="dark"] .system-prompt-lock-btn { border-color: var(--border-light); color: var(--text-secondary); }
+[data-theme="dark"] .system-prompt-lock-btn:hover { background: var(--bg-hover, #2A2625); border-color: #555; }
 [data-theme="dark"] .test-result.fail { color: #F0A090; }
 [data-theme="dark"] .avatar-preview-circle { border-color: var(--border-light); }
 [data-theme="dark"] .char-preview-card { background: var(--bg-card); border-color: var(--border-light); }

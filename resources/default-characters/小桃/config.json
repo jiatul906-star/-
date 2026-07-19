@@ -1,0 +1,12 @@
+{
+  "id": "char_1",
+  "name": "小桃",
+  "gradient": "linear-gradient(175deg, #FDD9C4 0%, #F2B8A0 40%, #E8A38B 100%)",
+  "personality": "",
+  "voiceId": "",
+  "speechStyle": "",
+  "referenceAudio": "",
+  "ttsEnabled": false,
+  "ttsSpeed": 1,
+  "ttsPitch": 0
+}

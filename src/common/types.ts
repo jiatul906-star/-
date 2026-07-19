@@ -15,6 +15,7 @@ export interface CharacterConfig {
   ttsEnabled: boolean      // 该角色是否启用 TTS
   ttsSpeed: number         // 语速 0.5-2.0，默认 1.0
   ttsPitch: number         // 音调 -12 ~ +12，默认 0
+  customSystemPrompt?: string  // 自定义 System Prompt，设置后优先于自动构建的提示词
 }
 
 export interface CharactersData {

@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+﻿import { contextBridge, ipcRenderer } from 'electron'
 import type { PetAction, CharactersData, ApiProfilesData, ApiProfile, ChatMessage, MemoryEntry, TtsSettings, GpuInfo, ModelDownloadProgress, PipInstallProgress } from '../common/types'
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -153,4 +153,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('tts:pipInstallProgress', listener)
     return () => ipcRenderer.removeListener('tts:pipInstallProgress', listener)
   },
+
+  // 数据目录路径
+  getDataPath: (): Promise<string> => ipcRenderer.invoke('app:getDataPath'),
 })

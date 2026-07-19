@@ -53,7 +53,7 @@ export default function BackgroundRemover({ imageUrl, onConfirm, onCancel }: Pro
 
   // 处理：在图片的 canvas 上执行色度键
   const processImage = useCallback(() => {
-    if (!imgRef.current) return
+    if (!imgRef.current || !imgLoaded) return
     const img = imgRef.current
     const canvas = document.createElement('canvas')
     canvas.width = img.naturalWidth
@@ -98,12 +98,13 @@ export default function BackgroundRemover({ imageUrl, onConfirm, onCancel }: Pro
       }
     }
     setShowPreview(true)
-  }, [keyColor, tolerance])
+  }, [keyColor, tolerance, imgLoaded])
 
-  // 自动处理
+  // 自动处理（图片加载后才生效）
   useEffect(() => {
+    if (!imgLoaded) return
     processImage()
-  }, [keyColor, tolerance])
+  }, [keyColor, tolerance, imgLoaded, processImage])
 
   // 绘制预览 canvas（源图 + 取色十字线）
   useEffect(() => {

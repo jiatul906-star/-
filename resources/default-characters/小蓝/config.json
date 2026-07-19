@@ -1,0 +1,12 @@
+{
+  "id": "char_2",
+  "name": "小蓝",
+  "gradient": "linear-gradient(175deg, #C8DCF5 0%, #B0C8E8 40%, #A8C8E8 100%)",
+  "personality": "",
+  "voiceId": "",
+  "speechStyle": "",
+  "referenceAudio": "",
+  "ttsEnabled": false,
+  "ttsSpeed": 1,
+  "ttsPitch": 0
+}

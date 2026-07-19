@@ -5,9 +5,14 @@ import type { ChatMessage, MemoryEntry, ApiProfile, CharacterConfig } from '../.
 
 /** 构建 System Prompt */
 export function buildSystemPrompt(char: CharacterConfig, memory: MemoryEntry[]): string {
+  // 如果设置了自定义 System Prompt，直接返回
+  if (char.customSystemPrompt) {
+    return char.customSystemPrompt
+  }
+
   const parts: string[] = []
 
-  parts.push(`你是${char.name}。`)
+  parts.push(`你的名字是${char.name}。`)
 
   if (char.personality) {
     parts.push(`\n你的性格：${char.personality}`)

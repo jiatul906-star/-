@@ -474,6 +474,12 @@ export default function SettingsWindow() {
   const [editingMemoryId, setEditingMemoryId] = useState<string | null>(null)
   const [editingMemoryText, setEditingMemoryText] = useState('')
 
+  // 可编辑的 System Prompt
+  const [promptText, setPromptText] = useState('')
+
+  // 锁定状态，防止误触编辑
+  const [locked, setLocked] = useState(true)
+
   // ===== 性格标签折叠 =====
   const [traitCollapsed, setTraitCollapsed] = useState(false)
   const COLLAPSE_THRESHOLD = 3
@@ -500,6 +506,17 @@ export default function SettingsWindow() {
     }
     return buildSystemPrompt(charPreview, memories)
   }, [activeChar, personality, speechStyle, memories])
+
+  // 同步 promptText：当 activeChar 变化或内置提示词更新时更新编辑框
+  useEffect(() => {
+    if (activeChar) {
+      if (activeChar.customSystemPrompt) {
+        setPromptText(activeChar.customSystemPrompt)
+      } else {
+        setPromptText(systemPromptPreview)
+      }
+    }
+  }, [activeChar?.id, personality, speechStyle, memories])
 
   // 初始化：加载角色 + 动作
   useEffect(() => {
@@ -598,6 +615,8 @@ export default function SettingsWindow() {
   const handleSelectChar = useCallback(
     (id: string) => {
       setActiveCharacterId(id)
+      const { characters } = usePetStore.getState()
+      window.electronAPI.saveCharacters({ characters, activeId: id })
     },
     [setActiveCharacterId],
   )
@@ -671,7 +690,17 @@ export default function SettingsWindow() {
     setBgRemoverOpen(false)
     setCharacterPortrait(activeChar.id, resultDataUrl)
     setPetImagePreview(resultDataUrl)
-  }, [activeChar, setCharacterPortrait])
+    // 持久化：将去底后的图片写入磁盘，否则刷新后显示原图
+    const updatedChar = { ...activeChar, imageDataUrl: resultDataUrl }
+    saveSingleChar(updatedChar)
+  }, [activeChar, setCharacterPortrait, saveSingleChar])
+
+  const [userDataPath, setUserDataPath] = useState('')
+
+  // 获取数据目录路径
+  useEffect(() => {
+    window.electronAPI.getDataPath().then((p) => setUserDataPath(p))
+  }, [])
 
   const toggleTheme = useCallback(() => {
     setThemeMode((prev) => {
@@ -855,6 +884,16 @@ export default function SettingsWindow() {
     persist(all, activeCharacterId)
   }, [activeChar, personalityTraits, characters, activeCharacterId, updateCharacter, persist])
 
+  const handlePromptChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const text = e.target.value
+    setPromptText(text)
+    if (activeChar) {
+      const updated = { ...activeChar, customSystemPrompt: text || undefined }
+      updateCharacter(updated)
+      const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
+      persist(all, activeCharacterId)
+    }
+  }, [activeChar, characters, updateCharacter, persist, activeCharacterId])
   const handleSaveActions = async (updated: PetAction[]) => {
     setActions(updated)
     await window.electronAPI.savePetActions(updated)
@@ -1145,12 +1184,25 @@ export default function SettingsWindow() {
                   <div className="form-group" style={{ borderTop: '1px solid rgba(0,0,0,0.04)', paddingTop: 14, marginTop: 8 }}>
                     <label>🤖 AI 视角预览</label>
                     <div className="hint" style={{ marginBottom: 8 }}>以下内容会作为 System Prompt 发送给 AI，实时反映上方设置</div>
-                    <div className="system-prompt-preview">
-                      {systemPromptPreview ? (
-                        <pre>{systemPromptPreview}</pre>
-                      ) : (
-                        <div className="system-prompt-empty">尚未设置性格描述、说话风格或记忆。填写上方字段后这里会显示 AI 将收到的完整提示词。</div>
-                      )}
+                    <div className={"system-prompt-preview" + (locked ? " locked" : "")}>
+                      <div className="system-prompt-toolbar">
+                        <span className="system-prompt-label">🤖 AI 视角提示词</span>
+                        <button
+                          className="system-prompt-lock-btn"
+                          onClick={() => setLocked(!locked)}
+                          title={locked ? "解锁编辑" : "锁定防止误触"}
+                        >
+                          {locked ? "🔒" : "🔓"}
+                        </button>
+                      </div>
+                      <textarea
+                        className="system-prompt-textarea"
+                        value={promptText}
+                        onChange={handlePromptChange}
+                        readOnly={locked}
+                        placeholder="尚未设置性格描述、说话风格或记忆。填写上方字段后这里会显示 AI 将收到的完整提示词。"
+                        rows={10}
+                      />
                     </div>
                   </div>
                 </>
@@ -1374,6 +1426,7 @@ export default function SettingsWindow() {
               <p><strong>版本：</strong>0.1.0</p>
               <p><strong>技术栈：</strong>Electron + React + TypeScript</p>
               <p><strong>功能：</strong>桌宠互动 · AI 聊天 · 角色自定义</p>
+              <p><strong>数据地址：</strong>{userDataPath || '加载中...'}</p>
               <div className="theme-toggle-section">
                 <label className="theme-toggle-label">
                   <span>🌓 主题模式</span>
