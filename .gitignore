@@ -6,3 +6,4 @@ dist/
 tts-preview/*.mp3
 *.zip
 *.mp4
+python-dist/

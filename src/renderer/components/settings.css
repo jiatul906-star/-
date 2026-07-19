@@ -1114,3 +1114,135 @@
   color: var(--accent);
   background: var(--bg-warm);
 }
+
+/* ===== TTS Voice Tab Styles ===== */
+
+.tts-status-banner {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.tts-status-banner .hint {
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.tts-status-ok {
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  color: var(--text-primary);
+}
+
+.tts-status-limited {
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  color: var(--text-primary);
+}
+
+.tts-status-unavailable {
+  background: rgba(244, 67, 54, 0.08);
+  border: 1px solid rgba(244, 67, 54, 0.25);
+  color: var(--text-primary);
+}
+
+.tts-status-checking {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+}
+
+.tts-status-error {
+  background: rgba(244, 67, 54, 0.08);
+  border: 1px solid rgba(244, 67, 54, 0.25);
+  color: #d32f2f;
+}
+
+/* Download Progress */
+
+.tts-download-progress {
+  padding: 10px 14px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.tts-download-label {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.tts-download-bar-track {
+  height: 6px;
+  background: var(--border-light);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 4px 0;
+}
+
+.tts-download-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* Reference Audio */
+
+.tts-ref-audio,
+.tts-ref-audio-empty {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+/* Small Button */
+
+.small-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 100ms ease;
+}
+
+.small-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.small-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Checkbox label */
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+/* TTS Section divider uses --border-color which is missing from root — fallback */
+.form-group [style*="borderTop"] {
+  margin-top: 16px;
+  padding-top: 16px;
+}
+}

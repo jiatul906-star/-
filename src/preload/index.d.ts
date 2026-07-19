@@ -1,4 +1,4 @@
-import type { PetAction, CharactersData, ApiProfilesData, ApiProfile, ChatMessage, MemoryEntry } from '../common/types'
+import type { PetAction, CharactersData, ApiProfilesData, ApiProfile, ChatMessage, MemoryEntry, TtsSettings, GpuInfo, ModelDownloadProgress, PipInstallProgress } from '../common/types'
 
 declare global {
   interface Window {
@@ -44,6 +44,23 @@ declare global {
       updateAgentMemory: (characterId: string, id: string, content: string) => Promise<void>
       exportAgentMemory: (characterId: string, charName: string) => Promise<{ success: boolean; error?: string }>
       importAgentMemory: (characterId: string) => Promise<{ success: boolean; entries?: MemoryEntry[]; error?: string; reason?: string }>
+      // ===== TTS =====
+      synthesizeTTS: (charName: string, text: string) => Promise<string | null>
+      checkTtsHealth: () => Promise<boolean>
+      getTtsStatus: () => Promise<{ status: string; port: number }>
+      getGpuInfo: () => Promise<GpuInfo>
+      getTtsSettings: () => Promise<TtsSettings>
+      saveTtsSettings: (settings: TtsSettings) => Promise<void>
+      onTtsSettingsUpdated: (callback: (settings: TtsSettings) => void) => () => void
+      saveReferenceAudio: (charName: string) => Promise<string | null>
+      getReferenceAudio: (charName: string) => Promise<string | null>
+      downloadModel: () => Promise<boolean>
+      getModelStatus: () => Promise<{ ready: boolean; dir: string }>
+      onModelDownloadProgress: (callback: (progress: ModelDownloadProgress) => void) => () => void
+      // Python 环境
+      checkPythonEnv: () => Promise<{ status: string; pythonPath: string; pythonVersion: string; pipVersion: string; error?: string }>
+      installDeps: () => Promise<boolean>
+      onPipInstallProgress: (callback: (progress: PipInstallProgress) => void) => () => void
     }
   }
 }

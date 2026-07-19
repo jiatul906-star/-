@@ -229,3 +229,42 @@
 [data-theme="dark"] .pet-character {
   background: transparent;
 }
+
+/* ===== TTS Talking Animation ===== */
+
+.pet-character.is-talking {
+  animation: pet-talk 0.4s ease-in-out infinite;
+}
+
+@keyframes pet-talk {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-2px); }
+  75% { transform: translateY(2px); }
+}
+
+/* Talking mouth animation for CSS pet face */
+.pet-character.is-talking .pet-mouth {
+  animation: mouth-talk 0.3s ease-in-out infinite;
+}
+
+@keyframes mouth-talk {
+  0%, 100% { transform: scaleY(0.6); }
+  50% { transform: scaleY(1.2); }
+}
+
+/* Glow ring when talking */
+.pet-character.is-talking::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--accent, #E8927C);
+  opacity: 0.4;
+  animation: talk-glow 1s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes talk-glow {
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.02); }
+}

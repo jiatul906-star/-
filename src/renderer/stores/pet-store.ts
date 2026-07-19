@@ -33,6 +33,14 @@ interface PetState {
   idleVideos: string[]
   isIdlePlaying: boolean
 
+  // ===== TTS =====
+  ttsEnabled: boolean          // 全局 TTS 开关
+  ttsPlaying: boolean          // 是否正在播放 TTS
+  ttsPlayingCharId: string | null  // 当前正在播放的角色
+  ttsPlayState: 'idle' | 'loading' | 'playing' | 'stopped'
+  ttsCurrentSentence: { index: number; total: number } | null  // 当前播放句子进度
+  autoPlayTTS: boolean         // AI 回复后自动播放
+
   // 操作 — 动作
   setActions: (actions: PetAction[]) => void
   openMenu: (originX: number, originY: number) => void
@@ -56,6 +64,13 @@ interface PetState {
   // 操作 — 空闲视频
   setIdleVideos: (videos: string[]) => void
   setIdlePlaying: (playing: boolean) => void
+
+  // 操作 — TTS
+  setTtsEnabled: (enabled: boolean) => void
+  setTtsPlaying: (playing: boolean, charId?: string | null) => void
+  setTtsPlayState: (state: 'idle' | 'loading' | 'playing' | 'stopped') => void
+  setTtsCurrentSentence: (sentence: { index: number; total: number } | null) => void
+  setAutoPlayTTS: (auto: boolean) => void
 }
 
 export const usePetStore = create<PetState>((set, get) => ({
@@ -73,6 +88,14 @@ export const usePetStore = create<PetState>((set, get) => ({
   characterAvatars: {},
   idleVideos: [],
   isIdlePlaying: false,
+
+  // ===== TTS 初始值 =====
+  ttsEnabled: false,
+  ttsPlaying: false,
+  ttsPlayingCharId: null,
+  ttsPlayState: 'idle',
+  ttsCurrentSentence: null,
+  autoPlayTTS: false,
 
   setActions: (actions) => set({ actions }),
 
@@ -208,4 +231,14 @@ export const usePetStore = create<PetState>((set, get) => ({
   // ===== 空闲视频 =====
   setIdleVideos: (videos) => set({ idleVideos: videos }),
   setIdlePlaying: (playing) => set({ isIdlePlaying: playing }),
+
+  // ===== TTS =====
+  setTtsEnabled: (enabled) => set({ ttsEnabled: enabled }),
+  setTtsPlaying: (playing, charId) => set({
+    ttsPlaying: playing,
+    ttsPlayingCharId: charId !== undefined ? charId : (playing ? get().ttsPlayingCharId : null),
+  }),
+  setTtsPlayState: (state) => set({ ttsPlayState: state }),
+  setTtsCurrentSentence: (sentence) => set({ ttsCurrentSentence: sentence }),
+  setAutoPlayTTS: (auto) => set({ autoPlayTTS: auto }),
 }))

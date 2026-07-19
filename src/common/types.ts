@@ -5,9 +5,16 @@ export interface CharacterConfig {
   name: string
   gradient: string        // CSS gradient 色值，用于 CSS 身体 + 侧边栏圆点
   personality: string
+  /** @deprecated 由 referenceAudio 替代，保留用于向后兼容 */
   voiceId: string
+  /** @deprecated 由 referenceAudio 替代，保留用于向后兼容 */
   speechStyle: string
   apiProfileId?: string    // 角色专属 API Profile ID，未设置则使用全局激活的 Profile
+  // ===== TTS 字段（v0.2.0） =====
+  referenceAudio: string   // 参考音频文件名（如 "ref_voice.wav"），空字符串表示未设置
+  ttsEnabled: boolean      // 该角色是否启用 TTS
+  ttsSpeed: number         // 语速 0.5-2.0，默认 1.0
+  ttsPitch: number         // 音调 -12 ~ +12，默认 0
 }
 
 export interface CharactersData {
@@ -34,6 +41,10 @@ export const DEFAULT_CHARACTERS: CharacterConfig[] = [
     personality: '',
     voiceId: '',
     speechStyle: '',
+    referenceAudio: '',
+    ttsEnabled: false,
+    ttsSpeed: 1.0,
+    ttsPitch: 0,
   },
   {
     id: 'char_2',
@@ -42,6 +53,10 @@ export const DEFAULT_CHARACTERS: CharacterConfig[] = [
     personality: '',
     voiceId: '',
     speechStyle: '',
+    referenceAudio: '',
+    ttsEnabled: false,
+    ttsSpeed: 1.0,
+    ttsPitch: 0,
   },
 ]
 
@@ -129,6 +144,52 @@ export interface MemoryEntry {
 export interface AppSettings {
   theme: 'warm-peach' | 'mint' | 'lavender' | 'milk-coffee' | 'sakura'
   density: 'comfortable' | 'compact'
+}
+
+// ===== TTS 设置（v0.2.0） =====
+
+export interface TtsSettings {
+  enabled: boolean           // 全局 TTS 开关
+  volume: number             // 全局音量 0-1，默认 0.8
+  autoPlay: boolean          // AI 回复后自动播放，默认 false
+}
+
+export const DEFAULT_TTS_SETTINGS: TtsSettings = {
+  enabled: false,
+  volume: 0.8,
+  autoPlay: false,
+}
+
+// ===== GPU 信息 =====
+
+export interface GpuInfo {
+  available: boolean         // 是否有可用的 NVIDIA GPU
+  vramMB: number             // 显存大小（MB），0 表示未知/无
+  model: string              // GPU 型号，如 "NVIDIA GeForce RTX 3060"
+  ttsSupported: boolean      // 显存 >= 4GB → true
+  ttsLevel: 'full' | 'limited' | 'unavailable'
+  // full: >= 8GB, limited: 4-7GB, unavailable: <4GB 或无 NVIDIA
+}
+
+// ===== 模型下载状态 =====
+
+export interface ModelDownloadProgress {
+  stage: 'checking' | 'downloading' | 'extracting' | 'done' | 'error'
+  percent: number            // 0-100
+  downloadedMB: number
+  totalMB: number
+  speedMBps: number          // 下载速度
+  error?: string
+}
+
+// ===== Python 环境安装状态 =====
+
+export interface PipInstallProgress {
+  stage: 'preparing' | 'installing' | 'done' | 'error'
+  percent: number            // 0-100
+  currentPackage: string     // 当前正在安装的包名
+  output: string             // 最近一行 pip 输出
+  error?: string
 }
 
 // ===== 桌宠动作系统 =====

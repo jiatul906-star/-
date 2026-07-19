@@ -30,6 +30,8 @@ export default function PetWindow() {
     characterPortraits,
     idleVideos,
     isIdlePlaying,
+    ttsPlaying,
+    ttsPlayingCharId,
     setActions,
     setCharactersData,
     setActiveCharacterId,
@@ -43,6 +45,9 @@ export default function PetWindow() {
     setIdleVideos,
     setIdlePlaying,
   } = usePetStore()
+
+  // TTS 嘴型同步：当前角色正在说话时显示 talking 状态
+  const isTalking = ttsPlaying && ttsPlayingCharId === activeCharacterId
 
   const activeChar = useMemo(
     () => characters.find((c) => c.id === activeCharacterId) ?? characters[0] ?? null,
@@ -449,8 +454,7 @@ export default function PetWindow() {
     <div className={`pet-window${menuVisible ? ' menu-open' : ''}`} onMouseDown={onMouseDownDead}>
       <div
         ref={characterRef}
-        className={`pet-character${dragging ? ' dragging' : ''}`}
-        data-offline={!isOnline ? 'true' : undefined}
+        className={`pet-character${dragging ? ' dragging' : ''}${isTalking ? ' is-talking' : ''}`}
         onContextMenu={onContextMenu}
         onMouseDown={onMouseDownChar}
         onClick={onClick}

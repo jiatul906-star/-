@@ -5,6 +5,7 @@ import { createChatWindow } from './windows/chat'
 import { createPetWindow } from './windows/pet'
 import { createSettingsWindow } from './windows/settings'
 import { registerIpc } from './ipc'
+import { getPythonManager } from './python-manager'
 import type { PetAction } from '../common/types'
 import { DEFAULT_PET_ACTIONS } from '../common/types'
 
@@ -134,7 +135,8 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) bootstrap()
 })
 
-app.on('before-quit', () => {
-  // 允许正常退出
+app.on('before-quit', async () => {
+  // 优雅关闭 Python TTS 服务
+  await getPythonManager().stop()
 })
 

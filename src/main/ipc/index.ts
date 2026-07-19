@@ -1,6 +1,9 @@
 import { ipcMain, BrowserWindow, app, dialog, shell } from 'electron'
 import { copyFileSync, existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, readdirSync, statSync, unlinkSync, rmdirSync } from 'fs'
 import { join } from 'path'
+import { getPythonManager } from '../python-manager'
+import { isModelReady, getModelDir, downloadModelWithProgress } from '../model-downloader'
+import { checkPythonEnv, installDependencies } from '../python-env-manager'
 import type {
   PetAction,
   CharacterConfig,
@@ -10,8 +13,10 @@ import type {
   ApiProfilesData,
   ChatMessage,
   MemoryEntry,
+  TtsSettings,
+  GpuInfo,
 } from '../../common/types'
-import { DEFAULT_CHARACTERS, PRESET_API_PROFILES } from '../../common/types'
+import { DEFAULT_CHARACTERS, PRESET_API_PROFILES, DEFAULT_TTS_SETTINGS } from '../../common/types'
 
 interface IpcDeps {
   loadPetActions: () => PetAction[]
@@ -69,7 +74,13 @@ function loadCharacterConfig(folderName: string): CharacterConfig | null {
   const configPath = join(charDir(folderName), 'config.json')
   try {
     if (existsSync(configPath)) {
-      return JSON.parse(readFileSync(configPath, 'utf-8')) as CharacterConfig
+      const raw = JSON.parse(readFileSync(configPath, 'utf-8')) as CharacterConfig
+      // 向后兼容：旧配置缺少新字段时填充默认值
+      if (raw.referenceAudio === undefined) raw.referenceAudio = ''
+      if (raw.ttsEnabled === undefined) raw.ttsEnabled = false
+      if (raw.ttsSpeed === undefined) raw.ttsSpeed = 1.0
+      if (raw.ttsPitch === undefined) raw.ttsPitch = 0
+      return raw
     }
   } catch {}
   return null
@@ -209,6 +220,104 @@ function saveCharAgentMemory(folderName: string, memories: MemoryEntry[]): void 
 }
 
 // ===== 迁移逻辑 =====
+
+// ===== TTS 设置持久化 =====
+
+const ttsSettingsFile = join(userDataPath, 'tts-settings.json')
+
+function loadTtsSettings(): TtsSettings {
+  try {
+    if (existsSync(ttsSettingsFile)) {
+      const raw = readFileSync(ttsSettingsFile, 'utf-8')
+      const data = JSON.parse(raw)
+      if (typeof data.enabled === 'boolean') {
+        return {
+          enabled: data.enabled,
+          volume: typeof data.volume === 'number' ? data.volume : DEFAULT_TTS_SETTINGS.volume,
+          autoPlay: typeof data.autoPlay === 'boolean' ? data.autoPlay : DEFAULT_TTS_SETTINGS.autoPlay,
+        }
+      }
+    }
+  } catch {}
+  return { ...DEFAULT_TTS_SETTINGS }
+}
+
+function saveTtsSettings(settings: TtsSettings): void {
+  try {
+    writeFileSync(ttsSettingsFile, JSON.stringify(settings, null, 2), 'utf-8')
+  } catch {}
+}
+
+// ===== 参考音频文件管理 =====
+
+function referenceAudioPath(folderName: string): string {
+  return join(charDir(folderName), 'ref_voice.wav')
+}
+
+function saveReferenceAudioToChar(folderName: string, sourcePath: string): boolean {
+  try {
+    const dir = charDir(folderName)
+    ensureDir(dir)
+    copyFileSync(sourcePath, referenceAudioPath(folderName))
+    return true
+  } catch {
+    return false
+  }
+}
+
+function getReferenceAudioDataUrl(folderName: string): string | null {
+  const p = referenceAudioPath(folderName)
+  if (!existsSync(p)) return null
+  try {
+    const buf = readFileSync(p)
+    const mime = 'audio/wav'
+    const base64 = buf.toString('base64')
+    return `data:${mime};base64,${base64}`
+  } catch {
+    return null
+  }
+}
+
+// ===== GPU 检测 =====
+
+function detectGpu(): GpuInfo {
+  try {
+    const { execSync } = require('child_process')
+    const output = execSync('nvidia-smi --query-gpu=name,memory.total --format=csv,noheader', {
+      timeout: 5000,
+      encoding: 'utf-8',
+    }).trim()
+
+    if (!output) {
+      return { available: false, vramMB: 0, model: '', ttsSupported: false, ttsLevel: 'unavailable' }
+    }
+
+    // 解析第一行：名称, 显存MB
+    const line = output.split('\n')[0]
+    const parts = line.split(',')
+    const model = (parts[0] || '').trim()
+    const vramStr = (parts[1] || '').trim()
+    const vramMB = parseInt(vramStr.replace(/\D/g, '')) || 0
+
+    let ttsLevel: GpuInfo['ttsLevel'] = 'unavailable'
+    if (vramMB >= 8000) {
+      ttsLevel = 'full'
+    } else if (vramMB >= 4000) {
+      ttsLevel = 'limited'
+    }
+
+    return {
+      available: true,
+      vramMB,
+      model,
+      ttsSupported: vramMB >= 4000,
+      ttsLevel,
+    }
+  } catch {
+    // nvidia-smi 不可用 → 无 NVIDIA GPU
+    return { available: false, vramMB: 0, model: '', ttsSupported: false, ttsLevel: 'unavailable' }
+  }
+}
 
 function migrateOldStructure(): boolean {
   const oldCharsFile = join(userDataPath, 'characters.json')
@@ -852,5 +961,143 @@ export function registerIpc(deps: IpcDeps) {
     const vDir = charVideoDir(folderName)
     ensureDir(vDir)
     await shell.openPath(vDir)
+  })
+
+  // ===== TTS Settings =====
+
+  ipcMain.handle('tts:getSettings', () => {
+    return loadTtsSettings()
+  })
+
+  ipcMain.handle('tts:saveSettings', (_event, settings: TtsSettings) => {
+    saveTtsSettings(settings)
+    for (const win of getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send('tts-settings:updated', settings)
+      }
+    }
+  })
+
+  // ===== TTS GPU Info =====
+
+  ipcMain.handle('tts:getGpuInfo', () => {
+    return detectGpu()
+  })
+
+  // ===== Reference Audio Management =====
+
+  ipcMain.handle('character:saveReferenceAudio', async (_event, charName: string) => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'Audio', extensions: ['wav', 'mp3', 'ogg', 'flac', 'aac', 'm4a'] }],
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+
+    const folderName = sanitizeFolderName(charName)
+    const ok = saveReferenceAudioToChar(folderName, result.filePaths[0])
+    if (!ok) return null
+
+    // 更新 config.json 中的 referenceAudio 字段
+    const config = loadCharacterConfig(folderName)
+    if (config) {
+      config.referenceAudio = 'ref_voice.wav'
+      saveCharacterConfig(folderName, config)
+
+      // 广播角色更新
+      const charactersData = loadCharactersData()
+      for (const win of getAllWindows()) {
+        if (!win.isDestroyed()) {
+          win.webContents.send('characters:updated', charactersData)
+        }
+      }
+    }
+
+    return 'ref_voice.wav'
+  })
+
+  ipcMain.handle('character:getReferenceAudio', (_event, charName: string) => {
+    const folderName = sanitizeFolderName(charName)
+    return getReferenceAudioDataUrl(folderName)
+  })
+
+  // ===== TTS Synthesize =====
+
+  ipcMain.handle('tts:synthesize', async (_event, charName: string, text: string) => {
+    const pm = getPythonManager()
+    if (pm.getStatus() !== 'running') {
+      const started = await pm.start()
+      if (!started) return null
+    }
+
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 30_000)
+      const resp = await fetch(`http://localhost:${pm.getPort()}/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          speaker: charName,
+          reference_audio: join(charDir(sanitizeFolderName(charName)), 'ref_voice.wav'),
+        }),
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
+
+      if (!resp.ok) return null
+      const buffer = await resp.arrayBuffer()
+      return Buffer.from(buffer).toString('base64')
+    } catch (err: any) {
+      console.error('[TTS] synthesize 失败:', err.message)
+      return null
+    }
+  })
+
+  // ===== TTS Health Check =====
+
+  ipcMain.handle('tts:checkHealth', async () => {
+    const pm = getPythonManager()
+    return pm.healthCheck()
+  })
+
+  // ===== TTS Service Status =====
+
+  ipcMain.handle('tts:getStatus', () => {
+    const pm = getPythonManager()
+    return {
+      status: pm.getStatus(),
+      port: pm.getPort(),
+    }
+  })
+
+  // ===== TTS Model Download =====
+
+  ipcMain.handle('tts:downloadModel', async (_event) => {
+    return downloadModelWithProgress(getAllWindows)
+  })
+
+  // ===== TTS Model Status =====
+
+  ipcMain.handle('tts:getModelStatus', () => {
+    return {
+      ready: isModelReady(),
+      dir: getModelDir(),
+    }
+  })
+
+  // ===== Python Environment Setup =====
+
+  ipcMain.handle('tts:checkPythonEnv', () => {
+    return checkPythonEnv()
+  })
+
+  ipcMain.handle('tts:installDeps', async (_event) => {
+    return installDependencies((progress) => {
+      for (const win of getAllWindows()) {
+        if (!win.isDestroyed()) {
+          win.webContents.send('tts:pipInstallProgress', progress)
+        }
+      }
+    })
   })
 }

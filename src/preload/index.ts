@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { PetAction, CharactersData, ApiProfilesData, ApiProfile, ChatMessage, MemoryEntry } from '../common/types'
+import type { PetAction, CharactersData, ApiProfilesData, ApiProfile, ChatMessage, MemoryEntry, TtsSettings, GpuInfo, ModelDownloadProgress, PipInstallProgress } from '../common/types'
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // 窗口控制
@@ -111,4 +111,46 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('agent-memory:export', characterId, charName),
   importAgentMemory: (characterId: string): Promise<{ success: boolean; entries?: MemoryEntry[]; error?: string; reason?: string }> =>
     ipcRenderer.invoke('agent-memory:import', characterId),
+
+  // ===== TTS =====
+  synthesizeTTS: (charName: string, text: string): Promise<string | null> =>
+    ipcRenderer.invoke('tts:synthesize', charName, text),
+  checkTtsHealth: (): Promise<boolean> =>
+    ipcRenderer.invoke('tts:checkHealth'),
+  getTtsStatus: (): Promise<{ status: string; port: number }> =>
+    ipcRenderer.invoke('tts:getStatus'),
+  getGpuInfo: (): Promise<GpuInfo> =>
+    ipcRenderer.invoke('tts:getGpuInfo'),
+  getTtsSettings: (): Promise<TtsSettings> =>
+    ipcRenderer.invoke('tts:getSettings'),
+  saveTtsSettings: (settings: TtsSettings): Promise<void> =>
+    ipcRenderer.invoke('tts:saveSettings', settings),
+  onTtsSettingsUpdated: (callback: (settings: TtsSettings) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, settings: TtsSettings) => callback(settings)
+    ipcRenderer.on('tts-settings:updated', listener)
+    return () => ipcRenderer.removeListener('tts-settings:updated', listener)
+  },
+  saveReferenceAudio: (charName: string): Promise<string | null> =>
+    ipcRenderer.invoke('character:saveReferenceAudio', charName),
+  getReferenceAudio: (charName: string): Promise<string | null> =>
+    ipcRenderer.invoke('character:getReferenceAudio', charName),
+  downloadModel: (): Promise<boolean> =>
+    ipcRenderer.invoke('tts:downloadModel'),
+  getModelStatus: (): Promise<{ ready: boolean; dir: string }> =>
+    ipcRenderer.invoke('tts:getModelStatus'),
+  onModelDownloadProgress: (callback: (progress: ModelDownloadProgress) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, progress: ModelDownloadProgress) => callback(progress)
+    ipcRenderer.on('tts:modelDownloadProgress', listener)
+    return () => ipcRenderer.removeListener('tts:modelDownloadProgress', listener)
+  },
+  // Python 环境
+  checkPythonEnv: (): Promise<{ status: string; pythonPath: string; pythonVersion: string; pipVersion: string; error?: string }> =>
+    ipcRenderer.invoke('tts:checkPythonEnv'),
+  installDeps: (): Promise<boolean> =>
+    ipcRenderer.invoke('tts:installDeps'),
+  onPipInstallProgress: (callback: (progress: PipInstallProgress) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, progress: PipInstallProgress) => callback(progress)
+    ipcRenderer.on('tts:pipInstallProgress', listener)
+    return () => ipcRenderer.removeListener('tts:pipInstallProgress', listener)
+  },
 })

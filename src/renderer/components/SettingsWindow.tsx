@@ -1,5 +1,5 @@
-﻿import { useEffect, useState, useCallback, useMemo } from 'react'
-import type { PetAction, CharacterConfig, ApiProfile, ApiProfilesData, MemoryEntry } from '../../common/types'
+﻿import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import type { PetAction, CharacterConfig, ApiProfile, ApiProfilesData, MemoryEntry, TtsSettings, GpuInfo, ModelDownloadProgress, PipInstallProgress } from '../../common/types'
 import { DEFAULT_PET_ACTIONS } from '../../common/types'
 import { usePetStore } from '../stores/pet-store'
 import { buildSystemPrompt } from '../plugins/chat/api'
@@ -32,6 +32,389 @@ function generateId(): string {
 function randomName(): string {
   const names = ['小桃', '小蓝', '小绿', '小茶', '小紫', '小黄', '小樱', '小白', '小灰', '未命名']
   return names[Math.floor(Math.random() * names.length)]
+}
+
+// ===== TTS 子组件 =====
+
+/** GPU 状态指示器 */
+function TtsGpuStatus() {
+  const [gpu, setGpu] = useState<GpuInfo | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    window.electronAPI.getGpuInfo().then((info) => {
+      setGpu(info)
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return <div className="tts-status-banner tts-status-checking">⏳ 正在检测 GPU ...</div>
+  }
+
+  if (!gpu) {
+    return <div className="tts-status-banner tts-status-error">⚠️ 无法检测 GPU 状态</div>
+  }
+
+  if (!gpu.available) {
+    return (
+      <div className="tts-status-banner tts-status-unavailable">
+        ❌ 未检测到 NVIDIA 显卡，语音功能不可用
+        <div className="hint">语音合成需要 NVIDIA 显卡（≥6GB 显存）。没有独立显卡时，聊天功能不受影响。</div>
+      </div>
+    )
+  }
+
+  const levelLabel: Record<string, string> = {
+    full: `✅ ${gpu.model}（${(gpu.vramMB / 1024).toFixed(1)}GB）— 完全支持`,
+    limited: `⚠️ ${gpu.model}（${(gpu.vramMB / 1024).toFixed(1)}GB）— 性能有限，合成可能较慢`,
+    unavailable: `❌ ${gpu.model}（${(gpu.vramMB / 1024).toFixed(1)}GB）— 显存不足`,
+  }
+
+  const levelClass: Record<string, string> = {
+    full: 'tts-status-ok',
+    limited: 'tts-status-limited',
+    unavailable: 'tts-status-unavailable',
+  }
+
+  return (
+    <div className={`tts-status-banner ${levelClass[gpu.ttsLevel] || ''}`}>
+      {levelLabel[gpu.ttsLevel] || levelLabel.unavailable}
+    </div>
+  )
+}
+
+/** Python 环境检测 + pip install */
+function TtsPythonEnv() {
+  const [envStatus, setEnvStatus] = useState<string>('not_checked')
+  const [envInfo, setEnvInfo] = useState<{ pythonVersion: string; pipVersion: string; error?: string }>({ pythonVersion: '', pipVersion: '' })
+  const [pipProgress, setPipProgress] = useState<PipInstallProgress | null>(null)
+  const [installing, setInstalling] = useState(false)
+
+  useEffect(() => {
+    window.electronAPI.checkPythonEnv().then((result) => {
+      setEnvStatus(result.status)
+      setEnvInfo({ pythonVersion: result.pythonVersion, pipVersion: result.pipVersion, error: result.error })
+    }).catch(() => setEnvStatus('error'))
+  }, [])
+
+  // 注册 pip 安装进度监听
+  useEffect(() => {
+    const unsub = window.electronAPI.onPipInstallProgress((p) => {
+      setPipProgress(p)
+      if (p.stage === 'done' || p.stage === 'error') {
+        setInstalling(false)
+        // 重新检测环境
+        window.electronAPI.checkPythonEnv().then((result) => {
+          setEnvStatus(result.status)
+        })
+      }
+    })
+    return unsub
+  }, [])
+
+  const handleInstall = async () => {
+    setInstalling(true)
+    await window.electronAPI.installDeps()
+  }
+
+  // 准备中 / 安装中
+  if (installing && pipProgress) {
+    return (
+      <div className="tts-status-banner tts-status-checking">
+        <div className="tts-download-label">
+          📦 {pipProgress.stage === 'preparing' ? '准备安装...' : `安装 Python 依赖... ${pipProgress.percent}%`}
+        </div>
+        {pipProgress.stage === 'installing' && (
+          <div className="tts-download-bar-track" style={{ marginTop: 4 }}>
+            <div
+              className="tts-download-bar-fill"
+              style={{ width: `${Math.min(100, pipProgress.percent)}%` }}
+            />
+          </div>
+        )}
+        <div className="hint" style={{ fontSize: 11, fontFamily: 'monospace', maxHeight: 36, overflow: 'hidden' }}>
+          {pipProgress.output || (pipProgress.currentPackage ? `正在安装 ${pipProgress.currentPackage}...` : '')}
+        </div>
+      </div>
+    )
+  }
+
+  // 错误
+  if (pipProgress?.stage === 'error' && !installing) {
+    return (
+      <div className="tts-status-banner tts-status-error">
+        ❌ 安装失败: {pipProgress.error || '未知错误'}
+        <button className="small-btn" onClick={handleInstall} style={{ marginLeft: 8 }}>重试</button>
+      </div>
+    )
+  }
+
+  // Python 缺失
+  if (envStatus === 'python_missing') {
+    return (
+      <div className="tts-status-banner tts-status-unavailable">
+        ⚠️ Python 环境未检测到
+        <div className="hint">{envInfo.error || '嵌入式 Python 未安装。打包安装包后会自动包含。'}</div>
+      </div>
+    )
+  }
+
+  // 依赖未安装
+  if (envStatus === 'deps_missing') {
+    return (
+      <div className="tts-status-banner tts-status-limited">
+        📦 Python 依赖未安装（{envInfo.pythonVersion || '未知版本'}）
+        <div className="hint">首次使用语音功能需要安装 Python 依赖包（torch, index-tts 等，约 3GB）。国内用户自动使用清华镜像源。</div>
+        <button
+          className="small-btn"
+          onClick={handleInstall}
+          disabled={installing}
+          style={{ marginTop: 8 }}
+        >
+          {installing ? '安装中...' : '安装依赖'}
+        </button>
+      </div>
+    )
+  }
+
+  // 就绪
+  if (envStatus === 'ready') {
+    return (
+      <div className="tts-status-banner tts-status-ok">
+        ✅ Python 环境就绪（{envInfo.pythonVersion} · pip {envInfo.pipVersion}）
+      </div>
+    )
+  }
+
+  // 未检测
+  return (
+    <div className="tts-status-banner tts-status-checking">
+      ⏳ 正在检测 Python 环境...
+    </div>
+  )
+}
+
+/** 模型下载管理器 */
+function TtsModelManager() {
+  const [modelStatus, setModelStatus] = useState<{ ready: boolean; dir: string } | null>(null)
+  const [progress, setProgress] = useState<ModelDownloadProgress | null>(null)
+  const [downloading, setDownloading] = useState(false)
+
+  useEffect(() => {
+    window.electronAPI.getModelStatus().then(setModelStatus)
+    const unsub = window.electronAPI.onModelDownloadProgress((p) => setProgress(p))
+    return unsub
+  }, [])
+
+  const handleDownload = async () => {
+    setDownloading(true)
+    try {
+      await window.electronAPI.downloadModel()
+      const status = await window.electronAPI.getModelStatus()
+      setModelStatus(status)
+    } catch (err: any) {
+      console.error('模型下载失败:', err)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  if (modelStatus?.ready) {
+    return (
+      <div className="tts-status-banner tts-status-ok">
+        ✅ 语音模型已就绪
+        <div className="hint">模型位置: {modelStatus.dir}</div>
+      </div>
+    )
+  }
+
+  if (progress && progress.stage === 'downloading') {
+    return (
+      <div className="tts-download-progress">
+        <div className="tts-download-label">
+          📥 正在下载语音模型... {progress.percent}%
+        </div>
+        <div className="tts-download-bar-track">
+          <div
+            className="tts-download-bar-fill"
+            style={{ width: `${Math.min(100, progress.percent)}%` }}
+          />
+        </div>
+        <div className="hint">
+          {progress.downloadedMB.toFixed(0)} / {progress.totalMB.toFixed(0)} MB
+          {progress.speedMBps > 0 && ` · ${progress.speedMBps.toFixed(1)} MB/s`}
+        </div>
+      </div>
+    )
+  }
+
+  if (progress?.stage === 'error') {
+    return (
+      <div className="tts-status-banner tts-status-error">
+        ❌ 下载失败: {progress.error || '未知错误'}
+        <button className="small-btn" onClick={handleDownload} style={{ marginLeft: 8 }}>
+          重试
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="tts-status-banner tts-status-checking">
+      📦 语音模型未下载（约 2.3GB）
+      <div className="hint">首次启用语音功能需要下载模型文件。建议在 Wi-Fi 环境下进行。</div>
+      <button
+        className="small-btn"
+        onClick={handleDownload}
+        disabled={downloading}
+        style={{ marginTop: 8 }}
+      >
+        {downloading ? '下载中...' : '下载模型'}
+      </button>
+    </div>
+  )
+}
+
+/** 参考音频上传 + 播放 */
+function TtsReferenceAudio({ charName }: { charName: string }) {
+  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [fileName, setFileName] = useState<string | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  // 初始化：加载已保存的参考音频
+  useEffect(() => {
+    if (!charName) return
+    window.electronAPI.getReferenceAudio(charName).then((url) => {
+      if (url) {
+        setAudioUrl(url)
+        setFileName('ref_voice.wav')
+      }
+    })
+  }, [charName])
+
+  const handleUpload = async () => {
+    if (!charName) return
+    setUploading(true)
+    try {
+      const result = await window.electronAPI.saveReferenceAudio(charName)
+      if (result) {
+        setFileName(result)
+        const url = await window.electronAPI.getReferenceAudio(charName)
+        setAudioUrl(url)
+      }
+    } catch (err: any) {
+      console.error('上传参考音频失败:', err)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handlePlay = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0
+      audioRef.current.play().catch(() => {})
+    }
+  }
+
+  if (!audioUrl) {
+    return (
+      <div className="tts-ref-audio-empty">
+        <span style={{ color: 'var(--text-secondary, #999)' }}>未上传参考音频</span>
+        <button className="small-btn" onClick={handleUpload} disabled={uploading} style={{ marginLeft: 8 }}>
+          {uploading ? '上传中...' : '上传音频'}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="tts-ref-audio">
+      <span>✅ {fileName || '已设置'}</span>
+      <button className="small-btn" onClick={handlePlay} style={{ marginLeft: 8 }}>▶ 试听</button>
+      <button className="small-btn" onClick={handleUpload} disabled={uploading} style={{ marginLeft: 4 }}>
+        🔄 更换
+      </button>
+      {audioUrl && <audio ref={audioRef} src={audioUrl} preload="auto" />}
+    </div>
+  )
+}
+
+/** 全局 TTS 设置 */
+function TtsGlobalSettings() {
+  const { autoPlayTTS, setAutoPlayTTS, ttsEnabled, setTtsEnabled } = usePetStore()
+  const [volume, setVolume] = useState(0.8)
+
+  useEffect(() => {
+    window.electronAPI.getTtsSettings().then((s) => {
+      setTtsEnabled(s.enabled)
+      setAutoPlayTTS(s.autoPlay)
+      setVolume(s.volume)
+    })
+  }, [])
+
+  const save = useCallback(
+    (patch: Partial<TtsSettings>) => {
+      window.electronAPI.getTtsSettings().then((current) => {
+        const updated: TtsSettings = { ...current, ...patch }
+        window.electronAPI.saveTtsSettings(updated)
+      })
+    },
+    [],
+  )
+
+  return (
+    <>
+      <div className="form-group">
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={ttsEnabled}
+            onChange={(e) => {
+              setTtsEnabled(e.currentTarget.checked)
+              save({ enabled: e.currentTarget.checked })
+            }}
+          />
+          <span>启用全局语音功能</span>
+        </label>
+        <div className="hint">关闭后所有角色都不再播放语音</div>
+      </div>
+
+      <div className="form-group">
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={autoPlayTTS}
+            onChange={(e) => {
+              setAutoPlayTTS(e.currentTarget.checked)
+              save({ autoPlay: e.currentTarget.checked })
+            }}
+            disabled={!ttsEnabled}
+          />
+          <span>AI 回复后自动播放语音</span>
+        </label>
+        <div className="hint">开启后每条 AI 回复会自动朗读；关闭后需手动点击 🔊 按钮播放</div>
+      </div>
+
+      <div className="form-group">
+        <label>全局音量: {Math.round(volume * 100)}%</label>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          value={volume}
+          onChange={(e) => {
+            const v = parseFloat(e.currentTarget.value)
+            setVolume(v)
+            save({ volume: v })
+          }}
+          disabled={!ttsEnabled}
+        />
+      </div>
+    </>
+  )
 }
 
 export default function SettingsWindow() {
@@ -182,6 +565,15 @@ export default function SettingsWindow() {
     [],
   )
 
+  /** 保存单个角色的修改（不改变激活角色） */
+  const saveSingleChar = useCallback(
+    (char: CharacterConfig) => {
+      const updated = characters.map(c => c.id === char.id ? char : c)
+      window.electronAPI.saveCharacters({ characters: updated, activeId: activeCharacterId })
+    },
+    [characters, activeCharacterId],
+  )
+
   // ===== 角色操作 =====
   const handleSelectChar = useCallback(
     (id: string) => {
@@ -199,6 +591,10 @@ export default function SettingsWindow() {
       personality: '',
       voiceId: '',
       speechStyle: '',
+      referenceAudio: '',
+      ttsEnabled: false,
+      ttsSpeed: 1.0,
+      ttsPitch: 0,
     }
     addCharacter(newChar)
     const all = [...characters, newChar]
@@ -741,11 +1137,83 @@ export default function SettingsWindow() {
               )}
 
               {activeTab === 'voice' && (
-                <div className="form-group">
-                  <label>语音 ID</label>
-                  <input type="text" placeholder="输入 TTS 语音 ID" />
-                  <div className="hint">留空使用默认语音</div>
-                </div>
+                <>
+                  {/* GPU 状态 */}
+                  <TtsGpuStatus />
+
+                  {/* Python 环境 */}
+                  <TtsPythonEnv />
+
+                  {/* 模型管理 */}
+                  <TtsModelManager />
+
+                  {/* 参考音频 */}
+                  <div className="form-group">
+                    <label>🔊 参考音频</label>
+                    <div className="hint">上传 3-5 秒的 WAV/MP3 音频作为角色音色参考。要求安静环境，自然说话。</div>
+                    <TtsReferenceAudio charName={activeChar?.name ?? ''} />
+                  </div>
+
+                  {/* 角色 TTS 设置 */}
+                  <div className="form-group">
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={activeChar?.ttsEnabled ?? false}
+                        onChange={(e) => {
+                          if (!activeChar) return
+                          const updated = { ...activeChar, ttsEnabled: e.currentTarget.checked }
+                          updateCharacter(updated)
+                          saveSingleChar(updated)
+                        }}
+                      />
+                      <span>为该角色启用语音播放</span>
+                    </label>
+                  </div>
+
+                  {(activeChar?.ttsEnabled) && (
+                    <>
+                      <div className="form-group">
+                        <label>语速: {activeChar?.ttsSpeed?.toFixed(1) ?? '1.0'}x</label>
+                        <input
+                          type="range"
+                          min="0.5"
+                          max="2.0"
+                          step="0.1"
+                          value={activeChar?.ttsSpeed ?? 1.0}
+                          onChange={(e) => {
+                            if (!activeChar) return
+                            const updated = { ...activeChar, ttsSpeed: parseFloat(e.currentTarget.value) }
+                            updateCharacter(updated)
+                            saveSingleChar(updated)
+                          }}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>音调: {activeChar?.ttsPitch ?? 0}</label>
+                        <input
+                          type="range"
+                          min="-12"
+                          max="12"
+                          step="1"
+                          value={activeChar?.ttsPitch ?? 0}
+                          onChange={(e) => {
+                            if (!activeChar) return
+                            const updated = { ...activeChar, ttsPitch: parseInt(e.currentTarget.value, 10) }
+                            updateCharacter(updated)
+                            saveSingleChar(updated)
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* 全局 TTS 设置 */}
+                  <div className="form-group" style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border-color, #e0e0e0)' }}>
+                    <label style={{ fontWeight: 600 }}>🌐 全局语音设置</label>
+                    <TtsGlobalSettings />
+                  </div>
+                </>
               )}
 
               <div className="theme-toggle-section">

@@ -2,6 +2,7 @@
 import { motion } from 'framer-motion'
 import { usePetStore } from '../stores/pet-store'
 import { streamChat, buildSystemPrompt } from '../plugins/chat/api'
+import { playbackManager } from '../plugins/tts'
 import type { ChatMessage, ApiProfile, MemoryEntry } from '../../common/types'
 import './chat.css'
 
@@ -17,6 +18,67 @@ const WELCOME_MESSAGES: DisplayMessage[] = [
   { id: 'w1', role: 'assistant', content: '你好呀！今天想聊些什么呢？', timestamp: '' },
 ]
 
+/** TTS 播放按钮 — 每条 AI 消息旁 */
+function TtsPlayButton({ messageId, charName, content, charId }: {
+  messageId: string
+  charName: string
+  content: string
+  charId: string
+}) {
+  const { ttsEnabled, ttsPlaying, ttsPlayingCharId, ttsPlayState, setTtsPlaying, setTtsPlayState } = usePetStore()
+  const [ttsHealthy, setTtsHealthy] = useState(true)
+
+  // 定期检查 TTS 服务健康状态
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null
+    const check = () => {
+      window.electronAPI.checkTtsHealth().then(setTtsHealthy).catch(() => setTtsHealthy(false))
+    }
+    check()
+    interval = setInterval(check, 30_000) // 每 30s 检查一次
+    return () => { if (interval) clearInterval(interval) }
+  }, [])
+
+  const isThisPlaying = ttsPlaying && ttsPlayingCharId === charId
+  const isLoading = isThisPlaying && ttsPlayState === 'loading'
+  const canPlay = ttsEnabled && ttsHealthy
+
+  const handlePlay = () => {
+    if (isThisPlaying) {
+      // 停止播放
+      playbackManager.stop()
+      setTtsPlaying(false, null)
+      setTtsPlayState('stopped')
+    } else {
+      // 检查是否启用
+      if (!canPlay) return
+      setTtsPlaying(true, charId)
+      playbackManager.play(charName, content).finally(() => {
+        setTtsPlaying(false, null)
+      })
+    }
+  }
+
+  const getTitle = () => {
+    if (!ttsEnabled) return '语音功能未启用'
+    if (!ttsHealthy) return '语音服务不可用'
+    if (isLoading) return '正在加载...'
+    if (isThisPlaying) return '停止播放'
+    return '播放语音'
+  }
+
+  return (
+    <button
+      className={`chat-tts-btn${isThisPlaying ? ' playing' : ''}${isLoading ? ' loading' : ''}${!ttsHealthy && ttsEnabled ? ' error' : ''}`}
+      onClick={handlePlay}
+      title={getTitle()}
+      disabled={!canPlay}
+    >
+      {!ttsHealthy && ttsEnabled ? '⚠️' : isLoading ? '⏳' : isThisPlaying ? '⏹' : '🔊'}
+    </button>
+  )
+}
+
 export default function ChatWindow() {
   const {
     characters,
@@ -26,6 +88,13 @@ export default function ChatWindow() {
     setActiveCharacterId,
     setCharacterAvatar,
     loadAllCharacterAvatars,
+    // TTS
+    autoPlayTTS,
+    ttsEnabled,
+    ttsPlayState,
+    setTtsPlaying,
+    setTtsPlayState,
+    setTtsCurrentSentence,
   } = usePetStore()
 
   const activeChar = useMemo(
@@ -139,10 +208,41 @@ export default function ChatWindow() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // TTS: 跟踪最后一条完成的 AI 消息 ID
+  const lastCompleteAiIdRef = useRef<string | null>(null)
+
+  // 初始化 TTS 设置
+  useEffect(() => {
+    window.electronAPI.getTtsSettings().then((s) => {
+      usePetStore.getState().setTtsEnabled(s.enabled)
+      usePetStore.getState().setAutoPlayTTS(s.autoPlay)
+      playbackManager.setVolume(s.volume)
+    })
+    const unsub = window.electronAPI.onTtsSettingsUpdated((s) => {
+      usePetStore.getState().setTtsEnabled(s.enabled)
+      usePetStore.getState().setAutoPlayTTS(s.autoPlay)
+      playbackManager.setVolume(s.volume)
+    })
+    return unsub
+  }, [])
+
+  // TTS 播放回调
+  useEffect(() => {
+    playbackManager.setCallbacks({
+      onStateChange: (state) => setTtsPlayState(state),
+      onSentenceStart: (index, total) => setTtsCurrentSentence({ index: index + 1, total }),
+      onError: (msg) => console.warn('[TTS]', msg),
+    })
+  }, [setTtsPlayState, setTtsCurrentSentence])
+
   // ===== 发送消息 =====
   const sendMessage = useCallback(async (overrideText?: string) => {
     const text = (overrideText ?? inputText).trim()
     if (!text || isStreaming) return
+
+    // 打断 TTS
+    playbackManager.stop()
+    setTtsPlaying(false, null)
 
     setErrorMsg(null)
     if (overrideText === undefined) {
@@ -285,6 +385,16 @@ export default function ChatWindow() {
           characterId: activeChar.id,
         }
         window.electronAPI.addChatMessage(activeChar.id, aiMsg).catch(() => {})
+      }
+
+      // TTS 自动播放
+      lastCompleteAiIdRef.current = aiMsgId
+      const store = usePetStore.getState()
+      if (activeChar && fullContent && store.autoPlayTTS && store.ttsEnabled && activeChar.ttsEnabled) {
+        setTtsPlaying(true, activeChar.id)
+        playbackManager.play(activeChar.name, fullContent).finally(() => {
+          setTtsPlaying(false, null)
+        })
       }
     } catch (err: any) {
      if (err.name === 'AbortError') {
@@ -493,10 +603,21 @@ export default function ChatWindow() {
                   <div className="chat-msg-avatar chat-msg-avatar-error">!</div>
                 )}
                 <div>
-                  <div className={`chat-msg-bubble${msg.role === 'error' ? ' error' : ''}`}>
-                    {msg.content || (msg.role === 'assistant' && isStreaming ? <span className="chat-cursor">▍</span> : '')}
-                    {msg.role === 'assistant' && isStreaming && messages[messages.length - 1]?.id === msg.id && (
-                      <span className="chat-cursor">▍</span>
+                  <div className="chat-msg-row">
+                    <div className={`chat-msg-bubble${msg.role === 'error' ? ' error' : ''}`}>
+                      {msg.content || (msg.role === 'assistant' && isStreaming ? <span className="chat-cursor">▍</span> : '')}
+                      {msg.role === 'assistant' && isStreaming && messages[messages.length - 1]?.id === msg.id && (
+                        <span className="chat-cursor">▍</span>
+                      )}
+                    </div>
+                    {/* TTS 播放按钮 — 仅对 AI 消息且有内容时显示 */}
+                    {msg.role === 'assistant' && msg.content && activeChar && (
+                      <TtsPlayButton
+                        messageId={msg.id}
+                        charName={activeChar.name}
+                        content={msg.content}
+                        charId={activeChar.id}
+                      />
                     )}
                   </div>
                   {msg.timestamp && <div className="chat-msg-time">{msg.timestamp}</div>}

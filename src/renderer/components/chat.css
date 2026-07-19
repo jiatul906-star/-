@@ -525,3 +525,78 @@
   inset: 0;
   z-index: 99;
 }
+
+/* ===== TTS Play Button ===== */
+
+.chat-msg-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-tts-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg-subtle, rgba(0, 0, 0, 0.04));
+  color: var(--text-secondary, #999);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 100ms ease;
+  opacity: 0;
+}
+
+.chat-msg:hover .chat-tts-btn,
+.chat-tts-btn.playing,
+.chat-tts-btn.loading {
+  opacity: 1;
+}
+
+.chat-tts-btn:hover:not(:disabled) {
+  background: var(--bg-warm, #FFF5F2);
+  color: var(--accent, #E8927C);
+  transform: scale(1.1);
+}
+
+.chat-tts-btn.playing {
+  background: var(--accent, #E8927C);
+  color: #fff;
+}
+
+.chat-tts-btn.loading {
+  background: var(--accent, #E8927C);
+  color: #fff;
+  animation: tts-pulse 1s ease-in-out infinite;
+}
+
+.chat-tts-btn.error {
+  background: rgba(244, 67, 54, 0.1);
+  color: #d32f2f;
+  opacity: 1;
+  cursor: help;
+}
+
+.chat-tts-btn:disabled {
+  opacity: 0;
+  cursor: not-allowed;
+}
+
+.chat-tts-btn.error:disabled {
+  opacity: 1;
+}
+
+@keyframes tts-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* Sound wave indicator for the bubble being spoken */
+.chat-msg-bubble.speaking {
+  box-shadow: 0 0 0 2px var(--accent, #E8927C);
+  transition: box-shadow 150ms ease;
+}
