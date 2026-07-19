@@ -13,7 +13,7 @@
 
 import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
-import { existsSync, unlinkSync, createWriteStream } from 'fs'
+import { existsSync, unlinkSync, createWriteStream, readFileSync, writeFileSync } from 'fs'
 import { spawn, execSync } from 'child_process'
 import * as https from 'https'
 import * as http from 'http'
@@ -305,7 +305,9 @@ export async function installDependencies(
 
     child.on('close', (code) => {
       if (code === 0) {
-        // 安装成功后清理 tarball
+        // 安装成功后，patch indextts 源码：将 WeTextProcessing(pynini) 替换为 wetext
+        patchIndexttsForWetext(pythonPath)
+        // 清理 tarball
         try { unlinkSync(tarballPath) } catch { /* ignore */ }
         resolve(true)
       } else {
@@ -416,4 +418,90 @@ function runPipCommand(
 
     child.on('error', reject)
   })
+}
+
+/**
+ * Patch installed indextts 源码，将 WeTextProcessing (需要 pynini) 替换为 wetext
+ * patching：indextts/utils/front.py 中的 load() 方法
+ */
+function patchIndexttsForWetext(pythonPath: string): void {
+  try {
+    // 找到 indextts 的安装路径
+    const sitePackages = execSync(
+      `"${pythonPath}" -c "import indextts, os; print(os.path.dirname(indextts.__file__))"`,
+      { timeout: 5000, encoding: 'utf-8' }
+    ).trim()
+
+    const frontPy = join(sitePackages, 'utils', 'front.py')
+    if (!existsSync(frontPy)) {
+      console.warn('[python-env-manager] front.py not found for patching:', frontPy)
+      return
+    }
+
+    const content = readFileContent(frontPy)
+    if (!content) return
+
+    // 检查是否已 patched
+    if (content.includes('Use wetext on all platforms (pynini-free)')) {
+      console.log('[python-env-manager] indextts already patched for wetext')
+      return
+    }
+
+    // 替换 load() 方法中的平台判断
+    const oldLoad = `    def load(self):
+        # print(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+        # sys.path.append(model_dir)
+        import platform
+        if self.zh_normalizer is not None and self.en_normalizer is not None:
+            return
+        if platform.system() == "Darwin":
+            from wetext import Normalizer
+
+            self.zh_normalizer = Normalizer(remove_erhua=False, lang="zh", operator="tn")
+            self.en_normalizer = Normalizer(lang="en", operator="tn")
+        else:
+            from tn.chinese.normalizer import Normalizer as NormalizerZh
+            from tn.english.normalizer import Normalizer as NormalizerEn
+            # use new cache dir for build tagger rules with disable remove_interjections and remove_erhua
+            cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tagger_cache")
+            if not os.path.exists(cache_dir):
+                os.makedirs(cache_dir)
+                with open(os.path.join(cache_dir, ".gitignore"), "w") as f:
+                    f.write("*\\n")
+            self.zh_normalizer = NormalizerZh(
+                cache_dir=cache_dir, remove_interjections=False, remove_erhua=False, overwrite_cache=False
+            )
+            self.en_normalizer = NormalizerEn(overwrite_cache=False)`
+
+    const newLoad = `    def load(self):
+        if self.zh_normalizer is not None and self.en_normalizer is not None:
+            return
+        # Use wetext on all platforms (pynini-free; previously Darwin-only)
+        from wetext import Normalizer
+        self.zh_normalizer = Normalizer(remove_erhua=False, lang="zh", operator="tn")
+        self.en_normalizer = Normalizer(lang="en", operator="tn")`
+
+    const newContent = content.replace(oldLoad, newLoad)
+
+    // Also patch setup.py to remove WeTextProcessing from install_requires
+    // (already handled by using wetext in requirements.txt, but double-check)
+    writeFileContent(frontPy, newContent)
+    console.log('[python-env-manager] indextts patched: WeTextProcessing → wetext')
+  } catch (err: any) {
+    console.warn('[python-env-manager] failed to patch indextts:', err.message)
+  }
+}
+
+function readFileContent(path: string): string | null {
+  try {
+    return readFileSync(path, 'utf-8')
+  } catch {
+    return null
+  }
+}
+
+function writeFileContent(path: string, content: string): void {
+  try {
+    writeFileSync(path, content, 'utf-8')
+  } catch { /* ignore */ }
 }
