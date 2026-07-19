@@ -467,7 +467,7 @@ function patchIndexttsForWetext(pythonPath: string): void {
             if not os.path.exists(cache_dir):
                 os.makedirs(cache_dir)
                 with open(os.path.join(cache_dir, ".gitignore"), "w") as f:
-                    f.write("*\\n")
+                    f.write("*\n")
             self.zh_normalizer = NormalizerZh(
                 cache_dir=cache_dir, remove_interjections=False, remove_erhua=False, overwrite_cache=False
             )
