@@ -611,8 +611,8 @@ export default function ChatWindow() {
               <div key={msg.id} className={`chat-msg ${msg.role}`}>
                 {msg.role === 'assistant' && activeChar && (
                   <div className="chat-msg-avatar" style={{
-                    background: activeChar.avatarDataUrl
-                      ? `url(${activeChar.avatarDataUrl}) center/cover no-repeat`
+                    background: characterAvatars[activeChar.id]
+                      ? `url(${characterAvatars[activeChar.id]}) center/cover no-repeat`
                       : activeChar.gradient,
                   }} />
                 )}
