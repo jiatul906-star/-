@@ -140,3 +140,91 @@
 2. **再修 C**（PlaybackManager 音量）— 验证播放链路
 3. **修 B**（端口占用）— 防止下次启动冲突
 4. **最后做问题 2**（一键安装 UI）— 依赖前面修复稳定
+
+---
+
+## 问题 3：语音组件数据路径显示
+
+### 背景
+
+软件分发给其他用户后，用户可能尚未安装语音相关组件（Python、TTS 模型等）。用户需要在设置界面中：
+- 看到各组件的**数据存放地址**（知道文件会装到哪里）
+- 从软件内部**一键安装**缺失的组件
+
+当前 Voice 标签页虽然有一键安装按钮，但**完全没有展示各组件的实际路径**。用户遇到问题（模型加载失败、Python 找不到、参考音频路径错误）时毫无头绪，因为根本不知道数据存放在哪里。
+
+### 要求
+
+在设置界面 → 外观 → 声音（Voice）标签页中，**显示以下组件的完整数据路径**：
+
+| # | 路径项 | 实际目录/文件 | 用途 |
+|---|--------|-------------|------|
+| 1 | **应用数据根目录** | `%APPDATA%/ai-companion/` | 所有用户数据根目录 |
+| 2 | **TTS 模型目录** | `%APPDATA%/ai-companion/models/index-tts/` | IndexTTS 模型文件（~2.3GB） |
+| 3 | **Python 可执行文件** | 开发环境 `python-dist/python.exe` / 打包环境 `resources/python/python.exe` | 嵌入式 Python |
+| 4 | **TTS 服务脚本** | `python-server/tts_server.py` | IndexTTS HTTP 服务入口 |
+| 5 | **Python 依赖清单** | `python-server/requirements.txt` | pip 依赖列表 |
+| 6 | **TTS 设置文件** | `%APPDATA%/ai-companion/tts-settings.json` | 全局语音设置 |
+| 7 | **参考音频** | `%APPDATA%/ai-companion/character/{角色名}/ref_voice.wav` | 当前角色的音色参考 |
+| 8 | **角色数据目录** | `%APPDATA%/ai-companion/character/` | 所有角色配置/图片/视频 |
+| 9 | **模型下载缓存** | `%APPDATA%/ai-companion/index-tts.tar.gz` | 下载中的临时文件 |
+
+### 交互设计
+
+在 Voice 标签页的一键安装卡片（`TtsQuickSetup`）**下方**，增加一个 **"数据目录详情"** 折叠面板：
+
+```
+┌─ 语音功能状态 ─────────────────────────────┐
+│  ...（GPU/Python/模型状态 + 安装按钮）      │
+└───────────────────────────────────────────┘
+
+  ▶ 数据目录详情               ← 点击展开/折叠
+
+展开后：
+
+  ▼ 数据目录详情
+  ┌──────────────────────────────────────────┐
+  │  应用数据根目录    C:\Users\...\ai-companion\
+  │  TTS 模型目录      C:\Users\...\models\index-tts\
+  │  Python 可执行文件  C:\...\python-dist\python.exe
+  │  TTS 服务脚本      C:\...\python-server\tts_server.py
+  │  依赖清单          C:\...\python-server\requirements.txt
+  │  TTS 设置文件      C:\...\tts-settings.json
+  │  参考音频路径      C:\...\character\小桃\ref_voice.wav
+  │  角色数据目录      C:\...\character\
+  │  下载缓存          C:\...\index-tts.tar.gz
+  └──────────────────────────────────────────┘
+```
+
+### 技术要点
+
+- **默认折叠**，不干扰主流程。用户想看路径时点击展开即可
+- 所有路径显示为**等宽字体**（`Consolas` / `Cascadia Code`），方便复制
+- 路径文本设置 `user-select: all`，**点击即可全选 → Ctrl+C 复制**
+- 参考音频路径**跟随当前角色切换**，切换到小蓝后自动更新为 `character/小蓝/ref_voice.wav`
+- 采用主进程 `tts:getDataPaths` IPC handler 一次性返回所有路径对象，渲染进程挂载时调用
+
+### 设计原则
+
+- **不新增硬编码色值**：所有样式使用 `settings.css` 中已有的 CSS 变量
+- **不影响用户操作流**：默认折叠，不抢焦点，不阻塞安装按钮
+- **零门槛**：不需要用户手动翻找文件夹，路径一目了然
+
+### 影响范围
+
+| 文件 | 改动 |
+|------|------|
+| `src/main/ipc/index.ts` | 新增 `tts:getDataPaths` handler |
+| `src/preload/index.ts` | 新增 `getTtsDataPaths` 桥接 |
+| `src/preload/index.d.ts` | 新增类型声明 |
+| `src/renderer/components/SettingsWindow.tsx` | Voice 标签页中 `TtsQuickSetup` 下方新增 `TtsDataPaths` 组件 |
+| `src/renderer/components/settings.css` | 新增路径展示相关样式 |
+| `src/common/types.ts` | 新增 `TtsDataPaths` 接口定义 |
+
+### 验收标准
+
+1. Voice 标签页 → 点击 "数据目录详情" → 展开显示 9 条完整路径
+2. 每条路径与文件系统实际位置一致
+3. 点击路径文字可选中复制
+4. 切换角色 → 参考音频路径自动更新
+5. 安装组件前后，路径显示不变（路径在安装前就能看到，用户可以手动检查/准备）
