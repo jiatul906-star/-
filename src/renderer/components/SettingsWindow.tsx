@@ -6,6 +6,7 @@ import { buildSystemPrompt } from '../plugins/chat/api'
 import ActionEditor from './ActionEditor'
 import ImageCropper from './ImageCropper'
 import BackgroundRemover from './BackgroundRemover'
+import ChromaKeyVideo from './ChromaKeyVideo'
 import './settings.css'
 
 type NavKey = 'appearance' | 'actions' | 'about' | 'api'
@@ -470,6 +471,8 @@ export default function SettingsWindow() {
   const [charApiProfileId, setCharApiProfileId] = useState('')
   const [idleVideoChromaKey, setIdleVideoChromaKey] = useState('')
   const [idleVideoChromaKeyTolerance, setIdleVideoChromaKeyTolerance] = useState(100)
+  const [previewVideoPath, setPreviewVideoPath] = useState<string | null>(null)
+  const previewSeenRef = useRef(false)
 
   // ===== 主题状态 =====
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(
@@ -609,6 +612,17 @@ export default function SettingsWindow() {
       setCharApiProfileId(activeChar.apiProfileId || '')
       setIdleVideoChromaKey(activeChar.idleVideoChromaKey || '')
       setIdleVideoChromaKeyTolerance(activeChar.idleVideoChromaKeyTolerance ?? 100)
+      // 加载该角色的第一个空闲视频作为预览
+      previewSeenRef.current = false
+      setPreviewVideoPath(null)
+      window.electronAPI.listIdleVideos(activeChar.name).then(async (videos) => {
+        if (videos.length > 0 && !previewSeenRef.current) {
+          const path = await window.electronAPI.getVideoPath(activeChar.name, videos[0])
+          if (path && !previewSeenRef.current) {
+            setPreviewVideoPath('file:///' + path.replace(/\\/g, '/'))
+          }
+        }
+      })
     }
   }, [activeChar?.id, characterPortraits, characterAvatars])
 
@@ -1126,6 +1140,20 @@ export default function SettingsWindow() {
                       </div>
                     )}
                     <div className="hint">为空闲视频去底，输入视频背景色（#00FF00 绿幕 #0000FF 蓝幕）。仅对非透明格式（mp4/mov）生效。</div>
+                    {previewVideoPath && idleVideoChromaKey && (
+                      <div style={{ marginTop: 12, borderRadius: 10, overflow: 'hidden', width: '100%', maxWidth: 320, height: 240, background: 'repeating-conic-gradient(#e0e0e0 0% 25%, #fff 0% 50%) 0 0 / 20px 20px', position: 'relative' }}>
+                        <ChromaKeyVideo
+                          videoPath={previewVideoPath.replace(/^file:\/\/\//, '') || ''}
+                          chromaKey={idleVideoChromaKey || undefined}
+                          tolerance={idleVideoChromaKeyTolerance}
+                          useAlpha={false}
+                          onEnded={() => {}}
+                          onError={() => {}}
+                          className=""
+                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+                        />
+                      </div>
+                    )}
                   </div>
                   <div className="char-preview-card">
                     <div className="char-preview-header">
