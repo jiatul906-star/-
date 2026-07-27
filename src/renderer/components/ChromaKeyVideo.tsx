@@ -360,8 +360,8 @@ export default function ChromaKeyVideo({
       const ty2 = (sy + sh) / vh
 
       const texCoords = new Float32Array([
-        tx1, ty2,  tx2, ty2,  tx1, ty1,
-        tx1, ty1,  tx2, ty2,  tx2, ty1,
+        tx1, ty1,  tx2, ty1,  tx1, ty2,
+        tx1, ty2,  tx2, ty1,  tx2, ty2,
       ])
       gl.bindBuffer(gl.ARRAY_BUFFER, texBuffer)
       gl.bufferData(gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW)
