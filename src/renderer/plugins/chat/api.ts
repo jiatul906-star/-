@@ -59,6 +59,9 @@ export async function* streamChat(
     },
     body: JSON.stringify(body),
     signal,
+  }).catch((e: Error) => {
+    // Network-level errors: DNS failure, connection refused, timeout, etc.
+    throw new Error(`网络连接失败：${e.message || '无法连接到 API 服务器'}`)
   })
 
   if (!response.ok) {
