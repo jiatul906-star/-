@@ -534,11 +534,13 @@ export default function PetWindow() {
               onEnded={handleVideoEnded}
               onError={handleVideoError}
               className="pet-video"
+              style={!isIdlePlaying ? { transform: 'rotate(180deg)' } : undefined}
             />
           ) : (
             <video className="pet-video" src={currentVideo} autoPlay
               onEnded={handleVideoEnded}
               onError={handleVideoError}
+              style={!isIdlePlaying ? { transform: 'rotate(180deg)' } : undefined}
             />
           )
         )}
