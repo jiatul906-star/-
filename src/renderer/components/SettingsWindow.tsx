@@ -468,6 +468,8 @@ export default function SettingsWindow() {
   const [personality, setPersonality] = useState('')
   const [speechStyle, setSpeechStyle] = useState('')
   const [charApiProfileId, setCharApiProfileId] = useState('')
+  const [idleVideoChromaKey, setIdleVideoChromaKey] = useState('')
+  const [idleVideoChromaKeyTolerance, setIdleVideoChromaKeyTolerance] = useState(100)
 
   // ===== 主题状态 =====
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(
@@ -605,6 +607,8 @@ export default function SettingsWindow() {
       setPersonality(activeChar.personality || '')
       setSpeechStyle(activeChar.speechStyle || '')
       setCharApiProfileId(activeChar.apiProfileId || '')
+      setIdleVideoChromaKey(activeChar.idleVideoChromaKey || '')
+      setIdleVideoChromaKeyTolerance(activeChar.idleVideoChromaKeyTolerance ?? 100)
     }
   }, [activeChar?.id, characterPortraits, characterAvatars])
 
@@ -1030,6 +1034,98 @@ export default function SettingsWindow() {
                       <button className="avatar-upload-btn" onClick={handleUploadAvatar}>点击上传头像</button>
                     )}
                     <div className="hint">用于侧边栏和标题栏，建议正方形图片</div>
+                  </div>
+                  <div className="form-group">
+                    <label>待机视频去底色</label>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <input
+                        type="text"
+                        value={idleVideoChromaKey}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setIdleVideoChromaKey(val)
+                          if (!activeChar) return
+                          const updated = {
+                            ...activeChar,
+                            idleVideoChromaKey: val || undefined,
+                            idleVideoChromaKeyTolerance: idleVideoChromaKeyTolerance,
+                          }
+                          updateCharacter(updated)
+                          const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
+                          persist(all, activeCharacterId)
+                        }}
+                        placeholder="#00FF00 或留空=不启用"
+                        style={{ width: 200, padding: '6px 10px', borderRadius: 6, border: '1px solid #ddd', fontFamily: 'monospace', fontSize: 13 }}
+                      />
+                      {['#00FF00', '#0000FF', '#FF00FF', '#00FFFF'].map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => {
+                            setIdleVideoChromaKey(color)
+                            if (!activeChar) return
+                            const updated = {
+                              ...activeChar,
+                              idleVideoChromaKey: color,
+                              idleVideoChromaKeyTolerance: idleVideoChromaKeyTolerance,
+                            }
+                            updateCharacter(updated)
+                            const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
+                            persist(all, activeCharacterId)
+                          }}
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 14,
+                            border: idleVideoChromaKey === color ? '3px solid #E8927C' : '2px solid #ddd',
+                            background: color,
+                            cursor: 'pointer',
+                          }}
+                          title={color === '#00FF00' ? '绿色（绿幕）' : color === '#0000FF' ? '蓝色（蓝幕）' : color === '#FF00FF' ? '品红' : '青色'}
+                        />
+                      ))}
+                      {idleVideoChromaKey && (
+                        <button
+                          onClick={() => {
+                            setIdleVideoChromaKey('')
+                            if (!activeChar) return
+                            const updated = {
+                              ...activeChar,
+                              idleVideoChromaKey: undefined,
+                              idleVideoChromaKeyTolerance: undefined,
+                            }
+                            updateCharacter(updated)
+                            const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
+                            persist(all, activeCharacterId)
+                          }}
+                          style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #E8927C', background: 'transparent', color: '#E8927C', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}
+                        >
+                          清除
+                        </button>
+                      )}
+                    </div>
+                    {idleVideoChromaKey && (
+                      <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 12, color: '#999' }}>容差</span>
+                        <input
+                          type="range"
+                          min={10}
+                          max={255}
+                          value={idleVideoChromaKeyTolerance}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10)
+                            setIdleVideoChromaKeyTolerance(val)
+                            if (!activeChar) return
+                            const updated = { ...activeChar, idleVideoChromaKeyTolerance: val }
+                            updateCharacter(updated)
+                            const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
+                            persist(all, activeCharacterId)
+                          }}
+                          style={{ flex: 1, maxWidth: 200 }}
+                        />
+                        <span style={{ fontSize: 12, color: '#999', width: 30 }}>{idleVideoChromaKeyTolerance}</span>
+                      </div>
+                    )}
+                    <div className="hint">为空闲视频去底，输入视频背景色（#00FF00 绿幕 #0000FF 蓝幕）。仅对非透明格式（mp4/mov）生效。</div>
                   </div>
                   <div className="char-preview-card">
                     <div className="char-preview-header">

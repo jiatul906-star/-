@@ -16,6 +16,9 @@ export interface CharacterConfig {
   ttsSpeed: number         // 语速 0.5-2.0，默认 1.0
   ttsPitch: number         // 音调 -12 ~ +12，默认 0
   customSystemPrompt?: string  // 自定义 System Prompt，设置后优先于自动构建的提示词
+  // ===== 待机视频去底 =====
+  idleVideoChromaKey?: string            // 待机视频去底色（如 '#00FF00'），空=不启用
+  idleVideoChromaKeyTolerance?: number   // 容差 0-255，默认 100
 }
 
 export interface CharactersData {

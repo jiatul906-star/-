@@ -54,6 +54,11 @@ export default function PetWindow() {
     [characters, activeCharacterId],
   )
 
+  // 空闲视频是否启用 chroma key 去底（角色级配置）
+  const idleChromaKey = activeChar?.idleVideoChromaKey
+  const idleChromaKeyTolerance = activeChar?.idleVideoChromaKeyTolerance ?? 100
+  const idleUseChromaKey = !!idleChromaKey
+
   // ===== 右键聊天状态 =====
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [isChatStreaming, setIsChatStreaming] = useState(false)
@@ -533,11 +538,11 @@ export default function PetWindow() {
           </div>
         )}
         {videoVisible && currentVideo && (
-          (currentActionMeta?.cropX != null || currentActionMeta?.cropY != null || currentActionMeta?.cropW != null || currentActionMeta?.cropH != null || currentActionMeta?.chromaKey || isIdlePlaying && currentIdleIsAlpha) ? (
+          (currentActionMeta?.cropX != null || currentActionMeta?.cropY != null || currentActionMeta?.cropW != null || currentActionMeta?.cropH != null || currentActionMeta?.chromaKey || isIdlePlaying && (currentIdleIsAlpha || idleUseChromaKey)) ? (
             <ChromaKeyVideo
               videoPath={currentVideo?.replace(/^file:\/\/\//, '') || ''}
-              chromaKey={currentActionMeta?.chromaKey}
-              tolerance={currentActionMeta?.chromaKeyTolerance}
+              chromaKey={(isIdlePlaying ? currentActionMeta?.chromaKey || idleChromaKey : currentActionMeta?.chromaKey) ?? undefined}
+              tolerance={isIdlePlaying ? (currentActionMeta?.chromaKeyTolerance ?? idleChromaKeyTolerance) : (currentActionMeta?.chromaKeyTolerance ?? 100)}
               cropX={currentActionMeta?.cropX}
               cropY={currentActionMeta?.cropY}
               cropW={currentActionMeta?.cropW}
