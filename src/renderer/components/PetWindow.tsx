@@ -418,6 +418,12 @@ export default function PetWindow() {
         return
       }
 
+      // 如果 model 为空，提示并修复
+      if (!profile.model) {
+        setChatMessages((prev) => [...prev, { role: 'assistant' as const, content: 'API 配置中未设置模型名称 (model)，请在设置中完善。' }])
+        setIsChatStreaming(true)
+      }
+
       setIsChatStreaming(true)
       const controller = new AbortController()
       chatAbortRef.current = controller
