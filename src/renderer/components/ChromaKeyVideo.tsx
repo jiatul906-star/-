@@ -359,9 +359,11 @@ export default function ChromaKeyVideo({
       const tx2 = (sx + sw) / vw
       const ty2 = (sy + sh) / vh
 
+      // texCoords: swap ty1/ty2 to match raw <video> orientation
+      // (vertex shader gl_Position.y = -y already flips the Y axis)
       const texCoords = new Float32Array([
-        tx1, ty1,  tx2, ty1,  tx1, ty2,
-        tx1, ty2,  tx2, ty1,  tx2, ty2,
+        tx1, ty2,  tx2, ty2,  tx1, ty1,
+        tx1, ty1,  tx2, ty2,  tx2, ty1,
       ])
       gl.bindBuffer(gl.ARRAY_BUFFER, texBuffer)
       gl.bufferData(gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW)
