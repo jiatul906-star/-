@@ -175,7 +175,7 @@ export interface GpuInfo {
 // ===== 模型下载状态 =====
 
 export interface ModelDownloadProgress {
-  stage: 'checking' | 'downloading' | 'extracting' | 'done' | 'error'
+  stage: 'checking' | 'downloading' | 'done' | 'error'
   percent: number            // 0-100
   downloadedMB: number
   totalMB: number
@@ -186,7 +186,7 @@ export interface ModelDownloadProgress {
 // ===== Python 环境安装状态 =====
 
 export interface PipInstallProgress {
-  stage: 'preparing' | 'installing' | 'done' | 'error'
+  stage: 'preparing' | 'installing' | 'installing_indextts' | 'downloading_indextts' | 'done' | 'error'
   percent: number            // 0-100
   currentPackage: string     // 当前正在安装的包名
   output: string             // 最近一行 pip 输出

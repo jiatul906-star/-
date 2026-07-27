@@ -53,6 +53,14 @@ export function getRequirementsPath(): string {
   return join(app.getAppPath(), 'python-server', 'requirements.txt')
 }
 
+/** CPU-only requirements.txt (不含 CUDA torch，适合无 NVIDIA GPU 的用户) */
+export function getRequirementsCpuPath(): string {
+  if (app.isPackaged) {
+    return join(process.resourcesPath, 'python-server', 'requirements-cpu.txt')
+  }
+  return join(app.getAppPath(), 'python-server', 'requirements-cpu.txt')
+}
+
 /** index-tts tarball 下载临时路径 */
 function getIndexttsTarballPath(): string {
   return join(app.getPath('userData'), 'index-tts.tar.gz')
@@ -177,9 +185,11 @@ export interface PipInstallProgress {
  */
 export async function installDependencies(
   onProgress: (p: PipInstallProgress) => void,
+  useCuda: boolean = true,
 ): Promise<boolean> {
   const pythonPath = getEmbeddedPythonPath()
-  const requirementsPath = getRequirementsPath()
+  // GPU ????? CUDA ?????? CUDA torch??? CUDA ? CPU-only ?
+  const requirementsPath = useCuda ? getRequirementsPath() : getRequirementsCpuPath()
 
   if (!existsSync(pythonPath)) {
     onProgress({

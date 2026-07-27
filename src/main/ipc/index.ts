@@ -446,9 +446,24 @@ function migrateOldStructure(): boolean {
 // 确保 character/ 目录存在（首次启动或迁移后）
 function ensureCharacterStructure(): void {
   if (!existsSync(characterBase)) {
-    // 尝试迁移
+    // 尝试迁移旧数据
     if (!migrateOldStructure()) {
-      // 全新安装：创建默认结构
+      // 全新安装：只创建基础目录，角色数据由 loadCharactersData 中的 ensureDefaultCharacters 负责
+      ensureDir(characterBase)
+    }
+  }
+}
+
+// 组装 CharactersData（从文件夹读取所有角色）
+function loadCharactersData(): CharactersData {
+  ensureCharacterStructure()
+  // 如果 character/ 目录为空（只有 _index.json 或无任何子目录），从捆绑资源导入
+  const entries = existsSync(characterBase) ? readdirSync(characterBase).filter(f => f !== '_index.json') : []
+  if (entries.length === 0) {
+    ensureDefaultCharacters()
+    // 如果仍未导入（捆绑资源不存在），回退到硬编码默认角色
+    const recheck = existsSync(characterBase) ? readdirSync(characterBase).filter(f => f !== '_index.json') : []
+    if (recheck.length === 0) {
       ensureDir(characterBase)
       const index: CharacterIndex = { activeId: 'char_1', entries: {} }
       for (const char of DEFAULT_CHARACTERS) {
@@ -461,11 +476,6 @@ function ensureCharacterStructure(): void {
       saveIndex(index)
     }
   }
-}
-
-// 组装 CharactersData（从文件夹读取所有角色）
-function loadCharactersData(): CharactersData {
-  ensureCharacterStructure()
   const index = loadIndex()
   const characters: CharacterConfig[] = []
   for (const entry of Object.values(index.entries)) {
@@ -508,7 +518,11 @@ function ensureDefaultCharacters(): void {
     // 检查用户数据目录是否为空（仅含 _index.json 或无文件）
     const existingFiles = existsSync(userCharDir) ? readdirSync(userCharDir).filter(f => f !== '_index.json') : []
     if (existingFiles.length === 0) {
-      const bundledPath = join(process.resourcesPath, 'default-characters')
+      // 生产环境：从 extraResources 读取；开发环境：从 magins/ 目录读取
+      let bundledPath = join(process.resourcesPath, 'default-characters')
+      if (!app.isPackaged || !existsSync(bundledPath)) {
+        bundledPath = join(app.getAppPath(), 'magins', 'default-characters')
+      }
       if (!existsSync(bundledPath)) return
       ensureDir(userCharDir)
       // 复制整个 default-characters 目录到 userData/character
@@ -534,9 +548,8 @@ function ensureDefaultCharacters(): void {
 export function registerIpc(deps: IpcDeps) {
   const { loadPetActions, savePetActions, getPetWindow, getChatWindow, getOrCreateChatWindow, getOrCreateSettingsWindow, getAllWindows } = deps
 
-  // 启动时确保目录结构并导入默认角色
+  // 启动时确保目录结构（角色数据在 loadCharactersData 中按需导入）
   ensureCharacterStructure()
-  ensureDefaultCharacters()
 
   // ===== window controls =====
   ipcMain.handle('window:minimize', (event) => {
@@ -867,8 +880,6 @@ export function registerIpc(deps: IpcDeps) {
   ipcMain.handle('api-profiles:test', async (_event, profile: ApiProfile) => {
     try {
       const url = profile.baseUrl.replace(/\/+$/, '')
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 10000)
       const resp = await fetch(`${url}/models`, {
         headers: { Authorization: `Bearer ${profile.apiKey}` },
         signal: controller.signal,
@@ -1089,11 +1100,32 @@ export function registerIpc(deps: IpcDeps) {
 
   // ===== TTS Synthesize =====
 
-  ipcMain.handle('tts:synthesize', async (_event, charName: string, text: string) => {
+    ipcMain.handle('tts:synthesize', async (_event, charName: string, text: string) => {
     const pm = getPythonManager()
+
+    // 检查模型是否已下载
+    if (!isModelReady()) {
+      console.warn('[TTS] 模型未就绪，请先在设置中下载语音模型')
+      return null
+    }
+
+    // 检查角色的参考音频是否存在
+    const folderName = sanitizeFolderName(charName)
+    const refPath = join(charDir(folderName), 'ref_voice.wav')
+    if (!existsSync(refPath)) {
+      console.warn('[TTS] 参考音频不存在: “' + refPath + '”。请在设置 > 语音设置中上传该角色的参考音频(3-5秒WAV)')
+      return null
+    }
+
+    // 启动 Python TTS 服务（如果尚未运行）
     if (pm.getStatus() !== 'running') {
-      const started = await pm.start()
-      if (!started) return null
+      const gpu = detectGpu()
+      const device = gpu.available && gpu.ttsSupported ? 'auto' : 'cpu'
+      const started = await pm.start(device)
+      if (!started) {
+        console.error('[TTS] Python 服务启动失败')
+        return null
+      }
     }
 
     try {
@@ -1105,25 +1137,34 @@ export function registerIpc(deps: IpcDeps) {
         body: JSON.stringify({
           text,
           speaker: charName,
-          reference_audio: join(charDir(sanitizeFolderName(charName)), 'ref_voice.wav'),
+          reference_audio: refPath,
         }),
         signal: controller.signal,
       })
       clearTimeout(timeout)
 
-      if (!resp.ok) return null
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => '')
+        console.error('[TTS] 服务器返回错误: ' + resp.status + ' ' + errText)
+        return null
+      }
       const buffer = await resp.arrayBuffer()
       return Buffer.from(buffer).toString('base64')
     } catch (err: any) {
-      console.error('[TTS] synthesize 失败:', err.message)
+      console.error('[TTS] 合成请求异常:', err.message)
       return null
     }
   })
 
+
   // ===== TTS Health Check =====
 
-  ipcMain.handle('tts:checkHealth', async () => {
+    ipcMain.handle('tts:checkHealth', async () => {
     const pm = getPythonManager()
+    // 先检查模型是否已下载，模型未下载时 TTS 服务无法启动
+    if (!isModelReady()) {
+      return false
+    }
     return pm.healthCheck()
   })
 
@@ -1159,12 +1200,18 @@ export function registerIpc(deps: IpcDeps) {
   })
 
   ipcMain.handle('tts:installDeps', async (_event) => {
+    // ??? GPU??????? CUDA ? torch
+    const gpu = detectGpu()
+    const useCuda = gpu.available && gpu.vramMB >= 4000
+    console.log('[IPC] GPU??:', gpu.model || '?', 'useCuda:', useCuda)
     return installDependencies((progress) => {
       for (const win of getAllWindows()) {
         if (!win.isDestroyed()) {
           win.webContents.send('tts:pipInstallProgress', progress)
         }
       }
-    })
+    }, useCuda)
   })
 }
+
+

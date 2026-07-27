@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+﻿import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { usePetStore } from '../stores/pet-store'
 import { streamChat, buildSystemPrompt } from '../plugins/chat/api'
@@ -27,7 +27,8 @@ function TtsPlayButton({ messageId, charName, content, charId }: {
 }) {
   const { ttsEnabled, ttsPlaying, ttsPlayingCharId, ttsPlayState, setTtsPlaying, setTtsPlayState } = usePetStore()
   const [ttsHealthy, setTtsHealthy] = useState(true)
-
+  const [modelReady, setModelReady] = useState(false)
+  
   // 定期检查 TTS 服务健康状态
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null
@@ -36,12 +37,14 @@ function TtsPlayButton({ messageId, charName, content, charId }: {
     }
     check()
     interval = setInterval(check, 30_000) // 每 30s 检查一次
+    // 同时检查模型是否已下载
+    window.electronAPI.getModelStatus().then((s) => setModelReady(s.ready))
     return () => { if (interval) clearInterval(interval) }
   }, [])
 
   const isThisPlaying = ttsPlaying && ttsPlayingCharId === charId
   const isLoading = isThisPlaying && ttsPlayState === 'loading'
-  const canPlay = ttsEnabled && ttsHealthy
+  const canPlay = ttsEnabled && ttsHealthy && modelReady
 
   const handlePlay = () => {
     if (isThisPlaying) {
@@ -60,8 +63,9 @@ function TtsPlayButton({ messageId, charName, content, charId }: {
   }
 
   const getTitle = () => {
-    if (!ttsEnabled) return '语音功能未启用'
-    if (!ttsHealthy) return '语音服务不可用'
+    if (!ttsEnabled) return '语音功能未启用，请先在设置中开启'
+    if (!ttsHealthy) return '语音服务不可用，请检查服务状态'
+    if (!modelReady) return '语音模型未下载，请先下载模型'
     if (isLoading) return '正在加载...'
     if (isThisPlaying) return '停止播放'
     return '播放语音'
@@ -74,7 +78,7 @@ function TtsPlayButton({ messageId, charName, content, charId }: {
       title={getTitle()}
       disabled={!canPlay}
     >
-      {!ttsHealthy && ttsEnabled ? '⚠️' : isLoading ? '⏳' : isThisPlaying ? '⏹' : '🔊'}
+      {(!ttsHealthy && ttsEnabled) || (!modelReady && ttsEnabled) ? '⚠️' : isLoading ? '⏳' : isThisPlaying ? '⏹' : '🔊'}
     </button>
   )
 }
@@ -226,14 +230,17 @@ export default function ChatWindow() {
     return unsub
   }, [])
 
-  // TTS 播放回调
+  // TTS 播放回调——失败时显示错误信息
   useEffect(() => {
     playbackManager.setCallbacks({
       onStateChange: (state) => setTtsPlayState(state),
       onSentenceStart: (index, total) => setTtsCurrentSentence({ index: index + 1, total }),
-      onError: (msg) => console.warn('[TTS]', msg),
+      onError: (msg) => {
+        console.warn('[TTS]', msg)
+        setErrorMsg('语音合成失败: ' + msg)
+      },
     })
-  }, [setTtsPlayState, setTtsCurrentSentence])
+  }, [setTtsPlayState, setTtsCurrentSentence, setErrorMsg])
   // 同步主题模式：监听跨窗口的 storage 事件
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {

@@ -1,0 +1,37 @@
+# CPU-only variant - uses CPU torch from PyTorch CPU index
+# IndexTTS HTTP 服务依赖
+# 安装方式：pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 国内用户自动使用清华镜像源
+#
+# 注意：
+# - WeTextProcessing 替换为 wetext（pynini-free，跨平台可用，不依赖 MSVC 编译）
+# - maturin 已移除（wetext 不需要 Rust 编译）
+# - index-tts 不在 PyPI 上，由应用从 GitHub 下载 tarball 后本地 pip install
+# - torch 安装 CPU 版本即可（TTS 推理用 CPU 也能跑，GPU 版本体积大且需要 CUDA）
+
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+torch>=2.0.0 --index-url https://download.pytorch.org/whl/cpu
+torchaudio>=2.0.0
+sentencepiece
+soundfile
+transformers
+accelerate
+Cython
+g2p-en
+jieba
+keras
+numba
+numpy
+pandas
+matplotlib
+opencv-python
+vocos
+tensorboard
+omegaconf
+librosa
+tqdm
+einops
+wetext
+pyahocorasick
+kaldifst

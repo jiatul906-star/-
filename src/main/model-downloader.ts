@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ModelDownloader — 从 HuggingFace / 国内镜像下载 IndexTTS 模型
  *
  * 策略：
@@ -306,6 +306,8 @@ async function downloadModel(
   let lastChunkTime = Date.now()
   let lastChunkBytes = 0
   let speedMBps = 0
+  // 当 totalBytes 为 0（硬编码回退）时，用 content-length 动态估算总大小
+  let knownTotalBytes = totalBytes
 
   for (let i = 0; i < files.length; i++) {
     const f = files[i]
@@ -313,6 +315,11 @@ async function downloadModel(
 
     const success = await downloadFile(f.name, destPath, f.size, (chunkBytes, _total) => {
       const now = Date.now()
+      // 当 totalBytes 未知且当前文件有实际大小时，用内容长度估算总大小
+      if (knownTotalBytes === 0 && _total > 0 && f.size === 0) {
+        knownTotalBytes = downloadedBytes + (_total * (files.length - i))
+        f.size = _total
+      }
       const elapsed = (now - lastChunkTime) / 1000
       if (elapsed >= 1.0) {
         speedMBps = ((chunkBytes - lastChunkBytes) / elapsed) / (1024 * 1024)
@@ -321,13 +328,14 @@ async function downloadModel(
       }
 
       const totalSoFar = downloadedBytes + chunkBytes
-      const percent = totalBytes > 0 ? Math.round((totalSoFar / totalBytes) * 100) : 0
+      const effectiveTotal = knownTotalBytes > 0 ? knownTotalBytes : totalSoFar
+      const percent = effectiveTotal > 0 ? Math.round(Math.min(99, (totalSoFar / effectiveTotal) * 100)) : 0
 
       onProgress({
         stage: 'downloading',
         percent: Math.min(100, percent),
         downloadedMB: totalSoFar / (1024 * 1024),
-        totalMB: totalMB > 0 ? totalMB : totalSoFar / (1024 * 1024) + 1,
+        totalMB: knownTotalBytes > 0 ? knownTotalBytes / (1024 * 1024) : (totalSoFar / (1024 * 1024) + 1),
         speedMBps,
       })
     })
@@ -423,3 +431,4 @@ export async function downloadModelWithProgress(
     }
   })
 }
+

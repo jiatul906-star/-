@@ -39,8 +39,11 @@ export function setVolume(vol: number): void {
   gain.gain.value = Math.max(0, Math.min(1, vol))
 }
 
-/** 从 base64 WAV 数据创建 AudioBuffer */
-async function decodeBase64(base64: string): Promise<AudioBuffer> {
+/**
+ * 解码 base64 音频数据为 AudioBuffer
+ * 使用全局唯一的 AudioContext，解码前自动 resume()
+ */
+export async function decodeBase64(base64: string): Promise<AudioBuffer> {
   const c = getCtx()
   const binary = atob(base64)
   const bytes = new Uint8Array(binary.length)
@@ -70,6 +73,15 @@ export function playBuffer(buffer: AudioBuffer): Promise<void> {
   })
 }
 
+/**
+ * 从 base64 直接播放音频（解码 + 播放一步完成）
+ * 调用时会自动停止当前正在播放的音频
+ */
+export async function playBase64(base64: string): Promise<void> {
+  const buffer = await decodeBase64(base64)
+  return playBuffer(buffer)
+}
+
 /** 停止当前播放 */
 export function stop(): void {
   if (currentSource) {
@@ -85,6 +97,11 @@ export function stop(): void {
 /** 是否正在播放 */
 export function isPlaying(): boolean {
   return currentSource !== null
+}
+
+/** 获取全局 AudioContext（供外部直接使用 context 能力） */
+export function getAudioContext(): AudioContext | null {
+  return ctx
 }
 
 /** 销毁 AudioContext（应用退出时调用） */

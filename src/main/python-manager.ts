@@ -28,6 +28,7 @@ export class PythonManager {
   private port: number
   private status: Status = 'stopped'
   private restartCount = 0
+  private device: string = 'auto'
   private restartTimer: ReturnType<typeof setTimeout> | null = null
   private events: PythonManagerEvents = {}
   private pythonPath: string
@@ -50,7 +51,8 @@ export class PythonManager {
   }
 
   /** 启动 Python HTTP 服务（如果尚未运行） */
-  async start(): Promise<boolean> {
+  async start(device: 'auto' | 'cpu' | 'cuda' = 'auto'): Promise<boolean> {
+    this.device = device
     if (this.status === 'running') return true
     if (this.status === 'starting') {
       // 已经在启动中，等待就绪
@@ -70,7 +72,7 @@ export class PythonManager {
     }
 
     try {
-      this.process = spawn(this.pythonPath, [this.serverScript, '--port', String(this.port)], {
+      this.process = spawn(this.pythonPath, [this.serverScript, '--port', String(this.port), '--device', this.device], {
         stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env },
       })

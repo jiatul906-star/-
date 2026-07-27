@@ -237,6 +237,20 @@ function TtsModelManager() {
     )
   }
 
+  if (progress?.stage === 'checking' || downloading) {
+    return (
+      <div className="tts-download-progress">
+        <div className="tts-download-label">
+          ⏳ 正在准备下载...
+        </div>
+        <div className="tts-download-bar-track">
+          <div className="tts-download-bar-fill" style={{ width: '2%' }} />
+        </div>
+        <div className="hint">正在获取文件列表，请稍候...</div>
+      </div>
+    )
+  }
+
   if (progress && progress.stage === 'downloading') {
     return (
       <div className="tts-download-progress">
@@ -1447,6 +1461,7 @@ export default function SettingsWindow() {
     </div>
   )
 }
+
 
 
 

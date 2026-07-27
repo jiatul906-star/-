@@ -1,0 +1,21 @@
+{
+  "activeId": "char_1",
+  "entries": {
+    "char_1": {
+      "id": "char_1",
+      "folderName": "Alice"
+    },
+    "char_2": {
+      "id": "char_2",
+      "folderName": "Amy"
+    },
+    "char_ms32weml_7t98d": {
+      "id": "char_ms32weml_7t98d",
+      "folderName": "Mary"
+    },
+    "char_ms32wf7g_acjk9": {
+      "id": "char_ms32wf7g_acjk9",
+      "folderName": "Noma"
+    }
+  }
+}

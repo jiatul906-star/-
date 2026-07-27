@@ -9,7 +9,7 @@
  */
 
 import { synthesize, splitSentences } from './synthesize'
-import { playBuffer, stop as stopAudio, isPlaying, setVolume } from './audio-context'
+import { decodeBase64, playBuffer, stop as stopAudio, isPlaying, setVolume } from './audio-context'
 
 export type PlaybackState = 'idle' | 'loading' | 'playing' | 'stopped'
 
@@ -73,7 +73,10 @@ class PlaybackManager {
     this.processing = false
   }
 
-  /** 播放队列中的下一句 */
+  /**
+   * 使用共享 AudioContext 播放队列中的下一句
+   * 利用 audio-context.ts 的全局单例，确保 stop() 和音量控制正常工作
+   */
   private async processQueue(): Promise<void> {
     if (this.cancelled || this.queue.length === 0) {
       this.processing = false
@@ -84,7 +87,7 @@ class PlaybackManager {
     }
 
     const { text, index } = this.queue.shift()!
-    const total = this.queue.length + 1 + index // 原始总数
+    const total = this.queue.length + 1 + index
 
     this.callbacks.onSentenceStart?.(index, index + this.queue.length + 1)
     this.setState('loading')
@@ -94,7 +97,6 @@ class PlaybackManager {
       if (this.cancelled) return
 
       if (!base64) {
-        // 合成失败 → 跳过当前句，继续下一句
         console.warn(`[PlaybackManager] 合成失败: "${text.slice(0, 20)}..."`)
         this.callbacks.onError?.(`合成失败: ${text.slice(0, 20)}...`)
         await this.processQueue()
@@ -103,46 +105,12 @@ class PlaybackManager {
 
       this.setState('playing')
 
-      // 解码并播放
-      const binary = atob(base64)
-      const bytes = new Uint8Array(binary.length)
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i)
-      }
-
-      const ctx = new AudioContext()
-      let buffer: AudioBuffer
-      try {
-        buffer = await ctx.decodeAudioData(bytes.buffer)
-      } catch {
-        // 解码失败
-        ctx.close()
-        this.callbacks.onError?.(`解码失败: ${text.slice(0, 20)}...`)
-        await this.processQueue()
-        return
-      }
-
-      // 创建播放源（不走 audio-context 的全局单例模式，因为需要独立控制）
-      const source = ctx.createBufferSource()
-      source.buffer = buffer
-
-      // 通过 audio-context 的 gainNode 控制音量
-      const gainNode = ctx.createGain()
-      // 从 settings 读取音量...
-      gainNode.gain.value = 0.8
-      source.connect(gainNode)
-      gainNode.connect(ctx.destination)
-
-      await new Promise<void>((resolve) => {
-        source.onended = () => {
-          ctx.close()
-          resolve()
-        }
-        source.start(0)
-      })
+      // 使用共享 AudioContext 解码并播放
+      // decodeBase64 和 playBuffer 来自 audio-context.ts 的全局单例
+      // 这确保：1) stop() 能立即停止播放 2) 音量设置全局生效 3) 不重复创建 AudioContext
+      await playBuffer(await decodeBase64(base64))
 
       if (this.cancelled) {
-        try { ctx.close() } catch {}
         return
       }
 
