@@ -532,16 +532,13 @@ export default function SettingsWindow() {
     }
   }, [activeChar?.id, personality, speechStyle, memories])
 
-  // 初始化：加载角色 + 动作
+  // 初始化：加载角色
   useEffect(() => {
     window.electronAPI.getCharacters().then((data) => {
       setCharactersData(data)
       for (const c of data.characters) {
         loadCharacterImages(c.id, c.name)
       }
-    })
-    window.electronAPI.getPetActions().then((list) => {
-      setActions(list.length > 0 ? list : DEFAULT_PET_ACTIONS)
     })
 
     const unsubChars = window.electronAPI.onCharactersUpdated((data) => {
@@ -577,12 +574,15 @@ export default function SettingsWindow() {
     return () => unsubProfiles()
   }, [])
 
-  // 切换角色时加载记忆
+  // 切换角色时加载记忆 + 动作
   useEffect(() => {
     if (activeChar) {
       window.electronAPI.getAgentMemory(activeChar.id).then(setMemories)
+      window.electronAPI.getPetActions(activeChar.name).then((list) => {
+        setActions(list.length > 0 ? list : DEFAULT_PET_ACTIONS)
+      })
     }
-  }, [activeChar?.id])
+  }, [activeChar?.name])
   // ????????????? storage ??
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
@@ -909,8 +909,9 @@ export default function SettingsWindow() {
     }
   }, [activeChar, characters, updateCharacter, persist, activeCharacterId])
   const handleSaveActions = async (updated: PetAction[]) => {
+    if (!activeChar) return
     setActions(updated)
-    await window.electronAPI.savePetActions(updated)
+    await window.electronAPI.savePetActions(activeChar.name, updated)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }

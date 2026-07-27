@@ -4,6 +4,8 @@ import { join } from 'path'
 import { getPythonManager } from '../python-manager'
 import { isModelReady, getModelDir, downloadModelWithProgress } from '../model-downloader'
 import { checkPythonEnv, installDependencies } from '../python-env-manager'
+import { analyzeVideo, getFfmpegPath } from '../video-analyzer'
+import { transcodeWithProgress } from '../video-transcoder'
 import type {
   PetAction,
   CharacterConfig,
@@ -19,8 +21,7 @@ import type {
 import { DEFAULT_CHARACTERS, PRESET_API_PROFILES, DEFAULT_TTS_SETTINGS } from '../../common/types'
 
 interface IpcDeps {
-  loadPetActions: () => PetAction[]
-  savePetActions: (actions: PetAction[]) => void
+  loadLegacyPetActions: () => PetAction[]
   getPetWindow: () => BrowserWindow | null
   getChatWindow: () => BrowserWindow | null
   getOrCreateChatWindow: () => BrowserWindow
@@ -217,6 +218,25 @@ function saveCharAgentMemory(folderName: string, memories: MemoryEntry[]): void 
   const dir = charDir(folderName)
   ensureDir(dir)
   writeFileSync(join(dir, 'agent-memory.json'), JSON.stringify(memories, null, 2), 'utf-8')
+}
+
+// 角色文件夹 pet-actions 读写
+function loadCharPetActions(folderName: string): PetAction[] {
+  const p = join(charDir(folderName), 'pet-actions.json')
+  try {
+    if (existsSync(p)) {
+      const data = JSON.parse(readFileSync(p, 'utf-8'))
+      if (Array.isArray(data.actions)) return data.actions
+      if (Array.isArray(data)) return data
+    }
+  } catch {}
+  return []
+}
+
+function saveCharPetActions(folderName: string, actions: PetAction[]): void {
+  const dir = charDir(folderName)
+  ensureDir(dir)
+  writeFileSync(join(dir, 'pet-actions.json'), JSON.stringify({ actions }, null, 2), 'utf-8')
 }
 
 // ===== 迁移逻辑 =====
@@ -546,7 +566,7 @@ function ensureDefaultCharacters(): void {
 
 
 export function registerIpc(deps: IpcDeps) {
-  const { loadPetActions, savePetActions, getPetWindow, getChatWindow, getOrCreateChatWindow, getOrCreateSettingsWindow, getAllWindows } = deps
+  const { loadLegacyPetActions, getPetWindow, getChatWindow, getOrCreateChatWindow, getOrCreateSettingsWindow, getAllWindows } = deps
 
   // 启动时确保目录结构（角色数据在 loadCharactersData 中按需导入）
   ensureCharacterStructure()
@@ -590,16 +610,40 @@ export function registerIpc(deps: IpcDeps) {
     return next
   })
 
-  // ===== action persistence =====
-  ipcMain.handle('pet-actions:getAll', () => {
-    return loadPetActions()
+  // ===== action persistence (per-character) =====
+  ipcMain.handle('pet-actions:getAll', (_event, charName: string) => {
+    if (!charName) return DEFAULT_PET_ACTIONS
+    const folderName = sanitizeFolderName(charName)
+    let actions = loadCharPetActions(folderName)
+
+    // 迁移：角色文件夹尚无 pet-actions.json → 尝试从旧全局文件复制 + 清理 videoPath
+    if (actions.length === 0) {
+      const legacy = loadLegacyPetActions()
+      if (legacy.length > 0) {
+        // 清理旧绝对路径为纯文件名
+        actions = legacy.map(a => {
+          if (a.videoPath && a.videoPath.includes('\\')) {
+            return { ...a, videoPath: a.videoPath.split(/[/\\]/).pop() || a.videoPath }
+          }
+          return a
+        })
+        saveCharPetActions(folderName, actions)
+      } else {
+        // 全新角色：用默认动作
+        actions = DEFAULT_PET_ACTIONS
+      }
+    }
+    return actions
   })
 
-  ipcMain.handle('pet-actions:save', (_event, actions: PetAction[]) => {
-    savePetActions(actions)
+  ipcMain.handle('pet-actions:save', (_event, charName: string, actions: PetAction[]) => {
+    if (!charName) return
+    const folderName = sanitizeFolderName(charName)
+    saveCharPetActions(folderName, actions)
+    // 广播到所有窗口，payload 包含 charName 以便过滤
     for (const win of getAllWindows()) {
       if (!win.isDestroyed()) {
-        win.webContents.send('pet-actions:updated', actions)
+        win.webContents.send('pet-actions:updated', { charName, actions })
       }
     }
   })
@@ -689,6 +733,46 @@ export function registerIpc(deps: IpcDeps) {
     const srcPath = result.filePaths[0]
     const folderName = sanitizeFolderName(charName)
     const baseName = srcPath.split(/[/\\]/).pop()?.replace(/\.[^.]+$/, '') || 'video'
+
+    // Auto-detect alpha and transcode if needed
+    try {
+      const analysis = analyzeVideo(srcPath)
+      if (analysis.needsTranscode && analysis.hasAlpha) {
+        // Broadcast transcode start to all windows
+        for (const win of getAllWindows()) {
+          if (!win.isDestroyed()) {
+            win.webContents.send('video:transcodeProgress', {
+              percent: 0,
+              stage: 'transcoding' as const,
+              speed: '',
+            })
+          }
+        }
+
+        const result = await transcodeWithProgress(
+          srcPath,
+          charVideoDir(folderName),
+          baseName,
+          analysis.duration || 10,
+          getAllWindows,
+        )
+
+        if (result.success) {
+          return result.outputPath.split(/[/\\]/).pop() || null
+        }
+        // If transcode failed, fall through to copy original
+        console.warn('[dialog:openVideo] Transcode failed, falling back to copy:', result.error)
+      }
+
+      if (analysis.isAlphaWebm) {
+        // Already perfect - just copy
+        return copyVideoToChar(folderName, srcPath, baseName)
+      }
+    } catch (e) {
+      console.warn('[dialog:openVideo] Auto-detect failed, copying as-is:', e)
+    }
+
+    // Fallback: copy original as-is
     return copyVideoToChar(folderName, srcPath, baseName)
   })
 
@@ -1175,6 +1259,47 @@ export function registerIpc(deps: IpcDeps) {
     return {
       status: pm.getStatus(),
       port: pm.getPort(),
+    }
+  })
+
+  // ===== 视频分析 & 转码 =====
+
+  ipcMain.handle('video:analyze', async (_event, filePath: string) => {
+    try {
+      return { success: true, data: analyzeVideo(filePath) }
+    } catch (e: any) {
+      return { success: false, error: e.message || '分析失败' }
+    }
+  })
+
+  ipcMain.handle('video:transcode', async (_event, inputPath: string, charName: string, outputName?: string) => {
+    const folderName = sanitizeFolderName(charName)
+    const vDir = charVideoDir(folderName)
+    ensureDir(vDir)
+
+    // Analyze first to get duration for progress
+    let totalDuration = 10 // default estimate
+    try {
+      const analysis = analyzeVideo(inputPath)
+      totalDuration = analysis.duration || 10
+    } catch {}
+
+    const result = await transcodeWithProgress(
+      inputPath,
+      vDir,
+      outputName,
+      totalDuration,
+      getAllWindows,
+    )
+    return result
+  })
+
+  ipcMain.handle('video:checkFfmpeg', async () => {
+    try {
+      const path = getFfmpegPath()
+      return { available: !!path, path }
+    } catch {
+      return { available: false, path: null }
     }
   })
 

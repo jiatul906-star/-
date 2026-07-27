@@ -1,0 +1,40 @@
+{
+  "actions": [
+    {
+      "id": "pat_head",
+      "label": "摸摸头",
+      "emoji": "👋",
+      "videoPath": "12 (1).mov",
+      "order": 0,
+      "type": "normal",
+      "chromaKey": "#000000",
+      "chromaKeyTolerance": 11,
+      "cropX": 23.8,
+      "cropY": 0,
+      "cropW": 53.2,
+      "cropH": 84.7
+    },
+    {
+      "id": "feed",
+      "label": "喂食",
+      "emoji": "🍪",
+      "videoPath": "11 (1).mov",
+      "order": 1,
+      "type": "normal",
+      "cropX": 30.5,
+      "cropY": 0,
+      "cropW": 36.9,
+      "cropH": 100,
+      "chromaKey": "#000000",
+      "chromaKeyTolerance": 11
+    },
+    {
+      "id": "open_chat",
+      "label": "展开聊天",
+      "emoji": "💬",
+      "videoPath": "",
+      "order": 2,
+      "type": "chat"
+    }
+  ]
+}

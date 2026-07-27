@@ -10,9 +10,9 @@ declare global {
       togglePetPassthrough: () => Promise<boolean>
       movePet: (dx: number, dy: number) => Promise<void>
       resizePet: (expand: boolean, charWinX: number, charWinY: number) => Promise<void>
-      getPetActions: () => Promise<PetAction[]>
-      savePetActions: (actions: PetAction[]) => Promise<void>
-      onPetActionsUpdated: (callback: (actions: PetAction[]) => void) => () => void
+      getPetActions: (charName: string) => Promise<PetAction[]>
+      savePetActions: (charName: string, actions: PetAction[]) => Promise<void>
+      onPetActionsUpdated: (callback: (payload: { charName: string; actions: PetAction[] }) => void) => () => void
       openChat: () => Promise<void>
       openSettings: () => Promise<void>
       openVideoDialog: (charName: string) => Promise<string | null>
@@ -44,6 +44,11 @@ declare global {
       updateAgentMemory: (characterId: string, id: string, content: string) => Promise<void>
       exportAgentMemory: (characterId: string, charName: string) => Promise<{ success: boolean; error?: string }>
       importAgentMemory: (characterId: string) => Promise<{ success: boolean; entries?: MemoryEntry[]; error?: string; reason?: string }>
+      // ===== 视频分析 & 转码 =====
+      analyzeVideo: (filePath: string) => Promise<{ success: boolean; data?: any; error?: string }>
+      transcodeVideo: (inputPath: string, charName: string, outputName?: string) => Promise<{ success: boolean; outputPath: string; error?: string }>
+      checkFfmpeg: () => Promise<{ available: boolean; path: string | null }>
+      onVideoTranscodeProgress: (callback: (progress: { percent: number; stage: 'analyzing' | 'transcoding' | 'done' | 'error'; speed?: string; error?: string }) => void) => () => void
       // ===== TTS =====
       synthesizeTTS: (charName: string, text: string) => Promise<string | null>
       checkTtsHealth: () => Promise<boolean>

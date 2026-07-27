@@ -107,11 +107,15 @@ export default function PetWindow() {
 
   // ---- 初始化 ----
  useEffect(() => {
-   window.electronAPI.getPetActions().then(setActions)
    window.electronAPI.getCharacters().then((data) => {
      setCharactersData(data)
      for (const c of data.characters) {
        loadCharacterImages(c.id, c.name)
+     }
+     // 首次加载完成后，按活跃角色加载其动作
+     const active = data.characters.find(c => c.id === data.activeId) ?? data.characters[0]
+     if (active) {
+       window.electronAPI.getPetActions(active.name).then(setActions)
      }
    })
    const unsubChars = window.electronAPI.onCharactersUpdated((data) => {
@@ -120,7 +124,21 @@ export default function PetWindow() {
        loadCharacterImages(c.id, c.name)
      }
    })
-    const unsubActions = window.electronAPI.onPetActionsUpdated((updated) => setActions(updated))
+    const unsubActions = window.electronAPI.onPetActionsUpdated((payload) => {
+
+      // 仅更新当前活跃角色的动作
+
+      const store = usePetStore.getState()
+
+      const active = store.characters.find(c => c.id === store.activeCharacterId)
+
+      if (active && payload.charName === active.name) {
+
+        setActions(payload.actions)
+
+      }
+
+    })
    const unsubImage = window.electronAPI.onPetImageUpdated(({ charId, imageType, dataUrl }) => {
      if (imageType === 'portrait') {
        setCharacterPortrait(charId, dataUrl)
@@ -162,6 +180,9 @@ export default function PetWindow() {
     }
   }, [activeChar?.id])
 
+  // 当前空闲视频是否为 Alpha WebM（需要 WebGL 管线播放）
+  const [currentIdleIsAlpha, setCurrentIdleIsAlpha] = useState(false)
+
   // ---- 角色切换时加载空闲视频列表 ----
   useEffect(() => {
     if (activeChar) {
@@ -172,6 +193,12 @@ export default function PetWindow() {
       setIdleVideos([])
     }
   }, [activeChar?.name, setIdleVideos])
+
+  // ---- 判断视频文件是否为 Alpha WebM ----
+  const isAlphaVideoFile = useCallback((fileName: string): boolean => {
+    const ext = fileName.split('.').pop()?.toLowerCase()
+    return ext === 'webm'
+  }, [])
 
   // ---- 空闲视频自动播放 ----
   const scheduleIdleVideo = useCallback(() => {
@@ -211,6 +238,8 @@ export default function PetWindow() {
       const fullPath = await window.electronAPI.getVideoPath(char.name, fileName)
 
       if (fullPath) {
+        const isWebM = fileName.toLowerCase().endsWith('.webm')
+        setCurrentIdleIsAlpha(isWebM)
         usePetStore.setState({
           currentVideo: `file:///${fullPath.replace(/\\/g, '/')}`,
           videoVisible: true,
@@ -486,7 +515,7 @@ export default function PetWindow() {
           </div>
         )}
         {videoVisible && currentVideo && (
-          (currentActionMeta?.cropX != null || currentActionMeta?.cropY != null || currentActionMeta?.cropW != null || currentActionMeta?.cropH != null || currentActionMeta?.chromaKey) ? (
+          (currentActionMeta?.cropX != null || currentActionMeta?.cropY != null || currentActionMeta?.cropW != null || currentActionMeta?.cropH != null || currentActionMeta?.chromaKey || isIdlePlaying && currentIdleIsAlpha) ? (
             <ChromaKeyVideo
               videoPath={currentVideo?.replace(/^file:\/\/\//, '') || ''}
               chromaKey={currentActionMeta?.chromaKey}
@@ -495,6 +524,7 @@ export default function PetWindow() {
               cropY={currentActionMeta?.cropY}
               cropW={currentActionMeta?.cropW}
               cropH={currentActionMeta?.cropH}
+              useAlpha={isIdlePlaying && currentIdleIsAlpha}
               onEnded={handleVideoEnded}
               onError={handleVideoError}
               className="pet-video"

@@ -1,0 +1,40 @@
+{
+  "actions": [
+    {
+      "id": "custom_101",
+      "label": "摸摸头",
+      "emoji": "👋",
+      "videoPath": "32 (1).mov",
+      "order": 0,
+      "type": "normal",
+      "cropX": 24.5,
+      "cropY": 7.4,
+      "cropW": 49.4,
+      "cropH": 92.6,
+      "chromaKey": "#000000",
+      "chromaKeyTolerance": 0
+    },
+    {
+      "id": "custom_102",
+      "label": "发呆",
+      "emoji": "🍪",
+      "videoPath": "41 (1).mov",
+      "order": 1,
+      "type": "normal",
+      "cropX": 27.2,
+      "cropY": 0,
+      "cropW": 43.6,
+      "cropH": 100,
+      "chromaKey": "#000000",
+      "chromaKeyTolerance": 8
+    },
+    {
+      "id": "open_chat",
+      "label": "展开聊天",
+      "emoji": "💬",
+      "videoPath": "",
+      "order": 2,
+      "type": "chat"
+    }
+  ]
+}

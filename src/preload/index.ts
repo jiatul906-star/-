@@ -15,12 +15,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
   resizePet: (expand: boolean, charWinX: number, charWinY: number): Promise<void> =>
     ipcRenderer.invoke('window:resizePet', expand, charWinX, charWinY),
 
-  // 动作持久化
-  getPetActions: (): Promise<PetAction[]> => ipcRenderer.invoke('pet-actions:getAll'),
-  savePetActions: (actions: PetAction[]): Promise<void> =>
-    ipcRenderer.invoke('pet-actions:save', actions),
-  onPetActionsUpdated: (callback: (actions: PetAction[]) => void): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, actions: PetAction[]) => callback(actions)
+  // ===== 视频分析 & 转码 =====
+  analyzeVideo: (filePath: string): Promise<{ success: boolean; data?: any; error?: string }> =>
+    ipcRenderer.invoke('video:analyze', filePath),
+  transcodeVideo: (inputPath: string, charName: string, outputName?: string): Promise<{ success: boolean; outputPath: string; error?: string }> =>
+    ipcRenderer.invoke('video:transcode', inputPath, charName, outputName),
+  checkFfmpeg: (): Promise<{ available: boolean; path: string | null }> =>
+    ipcRenderer.invoke('video:checkFfmpeg'),
+  onVideoTranscodeProgress: (callback: (progress: { percent: number; stage: 'analyzing' | 'transcoding' | 'done' | 'error'; speed?: string; error?: string }) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, progress: any) => callback(progress)
+    ipcRenderer.on('video:transcodeProgress', listener)
+    return () => ipcRenderer.removeListener('video:transcodeProgress', listener)
+  },
+
+  // 动作持久化（per-character）
+  getPetActions: (charName: string): Promise<PetAction[]> =>
+    ipcRenderer.invoke('pet-actions:getAll', charName),
+  savePetActions: (charName: string, actions: PetAction[]): Promise<void> =>
+    ipcRenderer.invoke('pet-actions:save', charName, actions),
+  onPetActionsUpdated: (callback: (payload: { charName: string; actions: PetAction[] }) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: { charName: string; actions: PetAction[] }) => callback(payload)
     ipcRenderer.on('pet-actions:updated', listener)
     return () => ipcRenderer.removeListener('pet-actions:updated', listener)
   },

@@ -1,43 +1,31 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage } from 'electron'
 import { join } from 'path'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { createChatWindow } from './windows/chat'
 import { createPetWindow } from './windows/pet'
 import { createSettingsWindow } from './windows/settings'
 import { registerIpc } from './ipc'
 import { getPythonManager } from './python-manager'
 import type { PetAction } from '../common/types'
-import { DEFAULT_PET_ACTIONS } from '../common/types'
 
 let chatWindow: BrowserWindow | null = null
 let petWindow: BrowserWindow | null = null
 let settingsWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 
-// 持久化动作配置（JSON 文件，替代 electron-store ESM 问题）
 const userDataPath = app.getPath('userData')
-const petActionsFile = join(userDataPath, 'pet-actions.json')
+const legacyPetActionsFile = join(userDataPath, 'pet-actions.json')
 
-function loadPetActions(): PetAction[] {
+/** 读取旧的全局 pet-actions.json（仅用于迁移到 per-character 存储） */
+function loadLegacyPetActions(): PetAction[] {
   try {
-    if (existsSync(petActionsFile)) {
-      const raw = readFileSync(petActionsFile, 'utf-8')
+    if (existsSync(legacyPetActionsFile)) {
+      const raw = readFileSync(legacyPetActionsFile, 'utf-8')
       const data = JSON.parse(raw)
       if (Array.isArray(data.actions)) return data.actions
     }
-  } catch {
-    // 文件损坏 → 用默认
-  }
-  return DEFAULT_PET_ACTIONS
-}
-
-function savePetActions(actions: PetAction[]): void {
-  try {
-    if (!existsSync(userDataPath)) mkdirSync(userDataPath, { recursive: true })
-    writeFileSync(petActionsFile, JSON.stringify({ actions }, null, 2), 'utf-8')
-  } catch {
-    // 静默失败
-  }
+  } catch {}
+  return []
 }
 
 /** 版本变更检测：版本变化时清除 API Key（隐私保护），保留角色数据 */
@@ -128,8 +116,7 @@ function bootstrap() {
   tray = createTray()
 
   registerIpc({
-    loadPetActions,
-    savePetActions,
+    loadLegacyPetActions,
     getPetWindow: () => petWindow,
     getChatWindow: () => chatWindow,
     getOrCreateChatWindow: () => {
@@ -173,4 +160,3 @@ app.on('before-quit', async () => {
   // 优雅关闭 Python TTS 服务
   await getPythonManager().stop()
 })
-

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { PetAction } from '../../common/types'
 import VideoCropper from './VideoCropper'
 import VideoChromaPicker from './VideoChromaPicker'
@@ -15,6 +15,17 @@ export default function ActionEditor({ actions, onSave, charName }: Props) {
   const [list, setList] = useState<PetAction[]>(() =>
     [...actions].sort((a, b) => a.order - b.order),
   )
+
+  // 当外部 actions 变化时（切换角色），刷新内部 list
+  useEffect(() => {
+    setList([...actions].sort((a, b) => a.order - b.order))
+    // 同时重置编辑状态，避免上一个角色的残留表单
+    setEditingId(null)
+    setAddMode(false)
+    setCropperVideoPath(null)
+    setChromaPickerOpen(false)
+    setChromaVideoPath(null)
+  }, [actions])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [addMode, setAddMode] = useState(false)
   const [cropperVideoPath, setCropperVideoPath] = useState<string | null>(null)
@@ -172,10 +183,10 @@ export default function ActionEditor({ actions, onSave, charName }: Props) {
               <div style={{ fontSize: 13, fontWeight: 500 }}>{action.label}</div>
               <div style={{ fontSize: 11, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {sys ? '系统动作' : action.videoPath || '无视频'}
-                {(action.cropX != null || action.cropY != null || action.cropW != null || action.cropH != null) && (
+                {!sys && (action.cropX != null || action.cropY != null || action.cropW != null || action.cropH != null) && (
                   <span style={{ color: '#E8927C', marginLeft: 6 }}>✂ 已裁切</span>
                 )}
-                {action.chromaKey && (
+                {!sys && action.chromaKey && (
                   <span style={{ color: '#7DB8A8', marginLeft: 4 }}>🎨 去底</span>
                 )}
               </div>
