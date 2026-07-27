@@ -12,6 +12,8 @@ interface Props {
   trimEnd?: number
   /** If true, use WebGL to preserve native alpha channel (for VP9 Alpha WebM) */
   useAlpha?: boolean
+  /** fill mode: 'contain' (default) or 'cover' */
+  fillMode?: 'contain' | 'cover'
   onEnded: () => void
   onError: () => void
   className?: string
@@ -143,7 +145,7 @@ function createProgram(gl: WebGLRenderingContext, vertexSrc: string, fragmentSrc
 
 export default function ChromaKeyVideo({
   videoPath, chromaKey, tolerance = 100, cropX, cropY, cropW, cropH,
-  trimStart, trimEnd, useAlpha = false, onEnded, onError, className, style,
+  trimStart, trimEnd, useAlpha = false, fillMode = 'contain', onEnded, onError, className, style,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -270,21 +272,37 @@ export default function ChromaKeyVideo({
       canvas.height = displayH * dpr
     }
 
-    // Calculate draw rect (contain within canvas)
+    // Calculate draw rect based on fillMode
     const cropAspect = sw / sh
     const canvasAspect = displayW / displayH
 
     let drawW: number, drawH: number, drawX: number, drawY: number
-    if (cropAspect > canvasAspect) {
-      drawW = displayW
-      drawH = displayW / cropAspect
-      drawX = 0
-      drawY = (displayH - drawH) / 2
+    if (fillMode === 'cover') {
+      // cover: fill the canvas, cropping excess
+      if (cropAspect > canvasAspect) {
+        drawH = displayH
+        drawW = displayH * cropAspect
+        drawX = (displayW - drawW) / 2
+        drawY = 0
+      } else {
+        drawW = displayW
+        drawH = displayW / cropAspect
+        drawX = 0
+        drawY = (displayH - drawH) / 2
+      }
     } else {
-      drawH = displayH
-      drawW = displayH * cropAspect
-      drawX = (displayW - drawW) / 2
-      drawY = 0
+      // contain: fit within canvas, letterbox if needed
+      if (cropAspect > canvasAspect) {
+        drawW = displayW
+        drawH = displayW / cropAspect
+        drawX = 0
+        drawY = (displayH - drawH) / 2
+      } else {
+        drawH = displayH
+        drawW = displayH * cropAspect
+        drawX = (displayW - drawW) / 2
+        drawY = 0
+      }
     }
 
     const gl = glRef.current
@@ -405,7 +423,7 @@ export default function ChromaKeyVideo({
     }
 
     animRef.current = requestAnimationFrame(renderFrame)
-  }, [cropX, cropY, cropW, cropH, hasChroma, useAlpha, chromaKey, tolerance])
+  }, [cropX, cropY, cropW, cropH, hasChroma, useAlpha, chromaKey, tolerance, fillMode])
 
   // Video lifecycle
   useEffect(() => {

@@ -550,10 +550,11 @@ export default function PetWindow() {
               cropW={isIdlePlaying ? (currentActionMeta?.cropW ?? activeChar?.idleVideoCropW) : currentActionMeta?.cropW}
               cropH={isIdlePlaying ? (currentActionMeta?.cropH ?? activeChar?.idleVideoCropH) : currentActionMeta?.cropH}
               useAlpha={isIdlePlaying && currentIdleIsAlpha}
+              fillMode={isIdlePlaying ? 'cover' : 'contain'}
               onEnded={handleVideoEnded}
               onError={handleVideoError}
               className="pet-video"
-              style={!isIdlePlaying ? { transform: 'rotate(180deg)' } : undefined}
+              style={!isIdlePlaying ? { transform: 'rotate(180deg)' } : { transform: 'scaleY(-1)' }}
             />
           ) : (
             <video className="pet-video" src={currentVideo} autoPlay
