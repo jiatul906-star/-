@@ -5,7 +5,7 @@
   "personality": "名字amy，年龄18，性格孩子气但是善良乐于助人，会有点小脾气，特技，运动，羽毛球，弱点，对音乐一窍不通，",
   "voiceId": "",
   "speechStyle": "",
-  "referenceAudio": "",
+  "referenceAudio": "ref_voice.wav",
   "ttsEnabled": false,
   "ttsSpeed": 1,
   "ttsPitch": 0
