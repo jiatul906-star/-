@@ -19,6 +19,11 @@ export interface CharacterConfig {
   // ===== 待机视频去底 =====
   idleVideoChromaKey?: string            // 待机视频去底色（如 '#00FF00'），空=不启用
   idleVideoChromaKeyTolerance?: number   // 容差 0-255，默认 100
+  // ===== 待机视频裁切 =====
+  idleVideoCropX?: number                // 裁切 X%（0-100）
+  idleVideoCropY?: number                // 裁切 Y%（0-100）
+  idleVideoCropW?: number                // 裁切宽度%（0-100）
+  idleVideoCropH?: number                // 裁切高度%（0-100）
 }
 
 export interface CharactersData {

@@ -473,6 +473,13 @@ export default function SettingsWindow() {
   const [idleVideoChromaKeyTolerance, setIdleVideoChromaKeyTolerance] = useState(100)
   const [previewVideoPath, setPreviewVideoPath] = useState<string | null>(null)
   const previewSeenRef = useRef(false)
+  // 待机视频裁切
+  const [idleVideoCropX, setIdleVideoCropX] = useState<number | undefined>()
+  const [idleVideoCropY, setIdleVideoCropY] = useState<number | undefined>()
+  const [idleVideoCropW, setIdleVideoCropW] = useState<number | undefined>()
+  const [idleVideoCropH, setIdleVideoCropH] = useState<number | undefined>()
+  const [idleCropperOpen, setIdleCropperOpen] = useState(false)
+  const [idleCropperVideoPath, setIdleCropperVideoPath] = useState<string | null>(null)
 
   // ===== 主题状态 =====
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(
@@ -612,6 +619,10 @@ export default function SettingsWindow() {
       setCharApiProfileId(activeChar.apiProfileId || '')
       setIdleVideoChromaKey(activeChar.idleVideoChromaKey || '')
       setIdleVideoChromaKeyTolerance(activeChar.idleVideoChromaKeyTolerance ?? 100)
+      setIdleVideoCropX(activeChar.idleVideoCropX)
+      setIdleVideoCropY(activeChar.idleVideoCropY)
+      setIdleVideoCropW(activeChar.idleVideoCropW)
+      setIdleVideoCropH(activeChar.idleVideoCropH)
       // 加载该角色的第一个空闲视频作为预览
       previewSeenRef.current = false
       setPreviewVideoPath(null)
@@ -1422,11 +1433,82 @@ export default function SettingsWindow() {
                       videoPath={previewVideoPath.replace(/^file:\/\/\//, '') || ''}
                       chromaKey={idleVideoChromaKey || undefined}
                       tolerance={idleVideoChromaKeyTolerance}
+                      cropX={idleVideoCropX}
+                      cropY={idleVideoCropY}
+                      cropW={idleVideoCropW}
+                      cropH={idleVideoCropH}
                       useAlpha={false}
                       onEnded={() => {}}
                       onError={() => {}}
                       className=""
                       style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+                    />
+                  </div>
+                )}
+
+                <div style={{ marginTop: 16 }}>
+                  <label style={{ fontWeight: 500, fontSize: 14 }}>✂ 待机视频裁切</label>
+                  <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
+                    裁切待机视频的播放区域（百分比），留空 = 全屏播放
+                  </div>
+                  {(idleVideoCropX != null || idleVideoCropY != null || idleVideoCropW != null || idleVideoCropH != null) && (
+                    <div style={{ marginTop: 4, fontSize: 12, color: '#E8927C' }}>
+                      已裁切：X:{idleVideoCropX ?? 0}% Y:{idleVideoCropY ?? 0}% W:{idleVideoCropW ?? 100}% H:{idleVideoCropH ?? 100}%
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <button
+                      onClick={async () => {
+                        if (!activeChar) return
+                        const videos = await window.electronAPI.listIdleVideos(activeChar.name)
+                        if (videos.length === 0) return
+                        const fullPath = await window.electronAPI.getVideoPath(activeChar.name, videos[0])
+                        if (fullPath) setIdleCropperVideoPath(fullPath)
+                        setIdleCropperOpen(true)
+                      }}
+                      style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #ddd', background: '#F5F3F1', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}
+                    >✂ 打开裁切窗口</button>
+                    {(idleVideoCropX != null || idleVideoCropY != null || idleVideoCropW != null || idleVideoCropH != null) && (
+                      <button
+                        onClick={() => {
+                          setIdleVideoCropX(undefined)
+                          setIdleVideoCropY(undefined)
+                          setIdleVideoCropW(undefined)
+                          setIdleVideoCropH(undefined)
+                          if (!activeChar) return
+                          const updated = { ...activeChar, idleVideoCropX: undefined, idleVideoCropY: undefined, idleVideoCropW: undefined, idleVideoCropH: undefined }
+                          updateCharacter(updated)
+                          const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
+                          persist(all, activeCharacterId)
+                        }}
+                        style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #E8927C', background: 'transparent', color: '#E8927C', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13 }}
+                      >↺ 清除裁切</button>
+                    )}
+                  </div>
+                </div>
+
+                {idleCropperOpen && idleCropperVideoPath && (
+                  <div className="crop-overlay" style={{ marginTop: 8 }}>
+                    <VideoCropper
+                      videoPath={idleCropperVideoPath}
+                      currentCropX={idleVideoCropX}
+                      currentCropY={idleVideoCropY}
+                      currentCropW={idleVideoCropW}
+                      currentCropH={idleVideoCropH}
+                      onConfirm={(cx, cy, cw, ch) => {
+                        setIdleVideoCropX(cx)
+                        setIdleVideoCropY(cy)
+                        setIdleVideoCropW(cw)
+                        setIdleVideoCropH(ch)
+                        setIdleCropperOpen(false)
+                        setIdleCropperVideoPath(null)
+                        if (!activeChar) return
+                        const updated = { ...activeChar, idleVideoCropX: cx, idleVideoCropY: cy, idleVideoCropW: cw, idleVideoCropH: ch }
+                        updateCharacter(updated)
+                        const all = characters.map((c) => (c.id === activeChar.id ? updated : c))
+                        persist(all, activeCharacterId)
+                      }}
+                      onCancel={() => { setIdleCropperOpen(false); setIdleCropperVideoPath(null) }}
                     />
                   </div>
                 )}

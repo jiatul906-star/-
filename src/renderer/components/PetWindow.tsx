@@ -58,6 +58,8 @@ export default function PetWindow() {
   const idleChromaKey = activeChar?.idleVideoChromaKey
   const idleChromaKeyTolerance = activeChar?.idleVideoChromaKeyTolerance ?? 100
   const idleUseChromaKey = !!idleChromaKey
+  // 空闲视频裁切（角色级配置）
+  const idleHasCrop = activeChar?.idleVideoCropX != null || activeChar?.idleVideoCropY != null || activeChar?.idleVideoCropW != null || activeChar?.idleVideoCropH != null
 
   // ===== 右键聊天状态 =====
   const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
@@ -538,15 +540,15 @@ export default function PetWindow() {
           </div>
         )}
         {videoVisible && currentVideo && (
-          (currentActionMeta?.cropX != null || currentActionMeta?.cropY != null || currentActionMeta?.cropW != null || currentActionMeta?.cropH != null || currentActionMeta?.chromaKey || isIdlePlaying && (currentIdleIsAlpha || idleUseChromaKey)) ? (
+          (currentActionMeta?.cropX != null || currentActionMeta?.cropY != null || currentActionMeta?.cropW != null || currentActionMeta?.cropH != null || currentActionMeta?.chromaKey || isIdlePlaying && (currentIdleIsAlpha || idleUseChromaKey || idleHasCrop)) ? (
             <ChromaKeyVideo
               videoPath={currentVideo?.replace(/^file:\/\/\//, '') || ''}
               chromaKey={(isIdlePlaying ? currentActionMeta?.chromaKey || idleChromaKey : currentActionMeta?.chromaKey) ?? undefined}
               tolerance={isIdlePlaying ? (currentActionMeta?.chromaKeyTolerance ?? idleChromaKeyTolerance) : (currentActionMeta?.chromaKeyTolerance ?? 100)}
-              cropX={currentActionMeta?.cropX}
-              cropY={currentActionMeta?.cropY}
-              cropW={currentActionMeta?.cropW}
-              cropH={currentActionMeta?.cropH}
+              cropX={isIdlePlaying ? (currentActionMeta?.cropX ?? activeChar?.idleVideoCropX) : currentActionMeta?.cropX}
+              cropY={isIdlePlaying ? (currentActionMeta?.cropY ?? activeChar?.idleVideoCropY) : currentActionMeta?.cropY}
+              cropW={isIdlePlaying ? (currentActionMeta?.cropW ?? activeChar?.idleVideoCropW) : currentActionMeta?.cropW}
+              cropH={isIdlePlaying ? (currentActionMeta?.cropH ?? activeChar?.idleVideoCropH) : currentActionMeta?.cropH}
               useAlpha={isIdlePlaying && currentIdleIsAlpha}
               onEnded={handleVideoEnded}
               onError={handleVideoError}
