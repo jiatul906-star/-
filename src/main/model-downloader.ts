@@ -32,14 +32,18 @@ const DOWNLOAD_SOURCES = [
 
 // IndexTTS-1.5 模型文件清单（硬编码兜底，避免 API 不可用时完全无法下载）
 // 来源：huggingface.co/IndexTeam/IndexTTS-1.5
+// ⚠️ 必须与远程仓库实际文件一致 — 文件名不同会导致下载失败
 const HARDCODED_FILES: Array<{ name: string; size: number }> = [
-  { name: 'config.json', size: 0 },
-  { name: 'tokenizer.json', size: 0 },
-  { name: 'special_tokens_map.json', size: 0 },
-  { name: 'tokenizer_config.json', size: 0 },
-  { name: 'added_tokens.json', size: 0 },
-  { name: 'model.safetensors', size: 0 },  // 也可能是分片，见下方
+  { name: 'bigvgan_discriminator.pth', size: 0 },
+  { name: 'bigvgan_generator.pth', size: 0 },
+  { name: 'bpe.model', size: 0 },
+  { name: 'config.yaml', size: 0 },
+  { name: 'dvae.pth', size: 0 },
+  { name: 'gpt.pth', size: 0 },
+  { name: 'unigram_12000.vocab', size: 0 },
 ]
+// 注意：IndexTTS-1.5 仓库只有以上 7 个有效文件，不是分片 safetensors 格式
+// 下面两个数组保留供未来其他模型使用，但当前不会追加到硬编码清单
 
 // 分片文件名模板（IndexTTS 大模型通常分片）
 const SAFETENSOR_SHARDS = [
@@ -122,8 +126,8 @@ async function fetchFileList(): Promise<Array<{ name: string; size: number }>> {
       const files = siblings
         .filter((s) => {
           const name = s.rfilename
-          if (name === '.gitattributes' || name === 'README.md') return false
-          if (/\.(safetensors|bin|json|txt|model|yaml|yml|pt|pth)$/i.test(name)) return true
+          if (name === '.gitattributes' || name === 'README.md' || name === 'README') return false
+          if (/\.(safetensors|bin|json|txt|model|yaml|yml|pt|pth|vocab)$/i.test(name)) return true
           return false
         })
         .map((s) => ({ name: s.rfilename, size: s.size ?? 0 }))
@@ -137,7 +141,9 @@ async function fetchFileList(): Promise<Array<{ name: string; size: number }>> {
     }
   }
 
-  // 2. 兜底：使用硬编码清单 + 猜测分片文件
+  // 2. 兜底：使用硬编码清单
+  // 注意：HARDCODED_FILES 已包含 IndexTTS-1.5 的全部 7 个文件，
+  //       不再追加 SAFETENSOR_SHARDS/EXTRA_FILES（那些文件不存在于此仓库）
   console.log('[ModelDownloader] 全部 API 源不可用，使用硬编码文件清单')
   const files = [...HARDCODED_FILES]
   // 如果已有下载记录，恢复之前的文件列表
@@ -306,8 +312,28 @@ async function downloadModel(
   let lastChunkTime = Date.now()
   let lastChunkBytes = 0
   let speedMBps = 0
-  // 当 totalBytes 为 0（硬编码回退）时，用 content-length 动态估算总大小
+  // 当 totalBytes 为 0（huggingface mirror API 不返回文件大小）时，用首个文件 content-length 动态估算
   let knownTotalBytes = totalBytes
+
+  // 首次下载前，尝试用 HEAD 请求探测第一个文件的大小来估算总量
+  if (knownTotalBytes === 0 && files.length > 0) {
+    const firstFile = files[0]
+    const firstUrl = `${DOWNLOAD_SOURCES[0]}/${encodeURIComponent(firstFile.name)}`
+    try {
+      const headResp = await fetch(firstUrl, { method: 'HEAD', signal: AbortSignal.timeout(5000) })
+      if (headResp.ok) {
+        const cl = parseInt(headResp.headers.get('content-length') || '0')
+        if (cl > 0) {
+          // 用第一个文件大小占总大小的比例估算（bigvgan_discriminator.pth ≈ 45.8%）
+          // 已知 totalSize = 3,602,705,784 (从之前的下载记录)
+          knownTotalBytes = 3602705784
+          console.log(`[ModelDownloader] 从 HEAD 请求估算总大小: ${(knownTotalBytes / 1e6).toFixed(0)} MB`)
+        }
+      }
+    } catch {
+      // HEAD 失败，继续用 content-length 逐文件动态估算
+    }
+  }
 
   for (let i = 0; i < files.length; i++) {
     const f = files[i]
