@@ -67,9 +67,17 @@ export async function* streamChat(
     if (response.status === 401 || response.status === 403) {
       msg = 'API Key 无效，请检查设置'
     } else if (response.status === 404) {
-      msg = 'API 地址不正确，请检查 Base URL'
+      msg = 'API 地址不正确，请检查 Base URL 和模型名称'
     } else if (response.status === 429) {
       msg = '请求过于频繁，请稍后重试'
+    } else if (response.status === 400) {
+      // Bad request — often model name or parameters
+      try {
+        const err = JSON.parse(text)
+        msg = err.error?.message || '请求参数错误，请检查模型名称和 API 地址'
+      } catch {
+        msg = '请求参数错误 (400)，请检查模型名称和 API 地址'
+      }
     } else if (response.status >= 500) {
       msg = '服务器错误，请稍后重试'
     } else if (text) {
