@@ -450,7 +450,19 @@ export default function PetWindow() {
             return copy
           })
         }
+
+        // 流式完成后保存 AI 回复 → IPC 广播 → ChatWindow 同步
+        if (activeChar && fullContent) {
+          window.electronAPI.addChatMessage(activeChar.id, {
+            id: 'popup_ai_' + now,
+            role: 'assistant',
+            content: fullContent,
+            timestamp: Date.now(),
+            characterId: activeChar.id,
+          }).catch(() => {})
+        }
         } catch (err: any) {
+          // 异常时也尝试保存已收到的部分内容
           if (activeChar && fullContent) {
             window.electronAPI.addChatMessage(activeChar.id, {
               id: 'popup_ai_' + now,
